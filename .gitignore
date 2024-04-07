@@ -1,0 +1,32 @@
+# Abaqus related files
+.xtale
+.itero
+.xtalo
+.cid
+.com
+.lck
+.mdl
+.msg
+.prt
+# .odb
+.ipm
+.sim
+.sta
+.stt
+.tmp
+.023
+*.rpy*
+*.exception
+
+*.i90
+*.i
+*.mod
+*__genmod.f90
+*__genmod.f
+
+# MS office temp files
+~$*
+
+# Folders
+.vscode/
+debug/
