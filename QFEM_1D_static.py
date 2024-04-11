@@ -14,6 +14,7 @@ class QFEM():
         # elements = np.array(lines[element_start:])
         nodes = np.loadtxt(StringIO(nodes), delimiter=',')
         elements = np.loadtxt(StringIO(elements), delimiter=',').astype(int)
+        elements -= 1  # Python numbering starts from zero
 
         if len(nodes.shape) == 1:
             nodes = np.array([nodes]).T
@@ -32,10 +33,10 @@ class QFEM():
 
         # Traction
         traction = 2
-        self.traction = np.array([[self.nnodes, 0, 2]])
+        self.traction = np.array([[self.nodes[-1], 'x', 2]])
 
         # Body force
-        self.body_force = 10
+        self.body_force = ['x', 10]
 
         A = 1
         mu = 50
@@ -46,7 +47,7 @@ class QFEM():
 
 def shape_func(xi, nnodes_el, ndim):
 
-    # It seems, the sequence of shape function needs to be in accordance with the local coords system!
+    # Shape function sequence should be in accordance with the node sequence in element connectivity!
 
     # xi (1 x ndim) is the local coordinate
     N = np.zeros(nnodes_el)
@@ -67,6 +68,8 @@ def shape_func(xi, nnodes_el, ndim):
 
 
 def shape_func_dev(xi, nnodes_el, ndim):
+
+    # Shape function sequence should be in accordance with the node sequence in element connectivity!
 
     # x.T*shape_dev gives dx/dxi
     dNdxi = np.zeros((nnodes_el, ndim))
@@ -114,6 +117,8 @@ def mat_stiffness(eps_, nnodes_el, ndim, E=201000, nu=0.3):
 
 def integration_points_weights(nnodes_el, ndim, reduced=False):
 
+    # Integration points sequence should be in accordance with the node sequence in element connectivity!
+
     if ndim ==3 and nnodes_el == 8:
         if reduced:
             xi = np.array([0, 0, 0])
@@ -146,7 +151,7 @@ def element_stiffness(model):
 
     for iel, element in enumerate(model.elements):
         node_num = element
-        xs_node = model.nodes[node_num-1]                # (nnodes_el x ndim)
+        xs_node = model.nodes[node_num]                # (nnodes_el x ndim)
         for ixi, xi in enumerate(xi_list):
             # This part are performed at the integration point
             # xs_int  = xs_node.T@shape_func(xi, nnodes_el, ndim)    # (ndim x 1) integration point coords
@@ -175,23 +180,31 @@ def element_stiffness(model):
 
 def global_stiffness(model, K_e):
 
-    K_global = np.zeros((model.ndim*model.nnodes, model.ndim*model.nnodes))
-    for element in model.elements:
-        K_e = element_stiffness(nodes, element, displacements[element], nnodes_el, ndim)
+    nnodes, ndim = model.nnodes, model.ndim
+    K_global = np.zeros((nnodes*ndim, nnodes*ndim))
+
+    for iel, element in enumerate(model.elements):
         node_num = element
-        for i, node1 in enumerate(node_num):
-            for dim1 in range(ndim):
-                for j,node2 in enumerate(node_num):
-                    for dim2 in range(ndim):
-                        K_global[ndim*node1+dim1, ndim*node2+dim2] += K_e[ndim*i+dim1, ndim*j+dim2]
+        # xs_node = model.nodes[node_num]                # (nnodes_el x ndim)
+        for nodeii, nodei in enumerate(node_num):
+            for nodejj, nodej in enumerate(node_num):
+                ind_i, ind_j = nodei*ndim, nodej*ndim
+                ind_ii, ind_jj = nodeii*ndim, nodejj*ndim
+                K_global[ind_i:ind_i+ndim, ind_j:ind_j+ndim] = K_e[iel, ind_ii:ind_ii+ndim, ind_jj:ind_jj+ndim]
 
     return K_global
+
+
+def global_force(model):
+
+
 
 
 if __name__ == '__main__':
 
     model = QFEM('1D_static.inp')
-    element_stiffness(model)
+    K_e= element_stiffness(model)
+    global_stiffness(model, K_e)
 
 
     displacement = np.zeros(ndim*nnodes)
