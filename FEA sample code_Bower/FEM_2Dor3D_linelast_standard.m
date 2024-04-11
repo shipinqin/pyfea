@@ -30,15 +30,15 @@ function FEM_2Dor3D_linelast_standard
 %                            dloads(1,j) Element number
 %                            dloads(2,j) face number
 %                            dloads(3,j), dloads(4,j), dloads(5,j) Components of traction
-%                            (assumed uniform) 
+%                            (assumed uniform)
 %
-%  To run the program you first need to set up an input file, as described in 
+%  To run the program you first need to set up an input file, as described in
 %  the lecture notes.  Then change the fopen command below to point to the file.
 %  Also change the fopen command in the post-processing step (near the bottom of the
 %  program) to point to a suitable output file.  Then execute the file in
 %  the usual fashion (e.g. hit the green arrow at the top of the MATLAB
 %  editor window)
-% 
+%
 %
 % ==================== Read data from the input file ===========================
 %
@@ -71,7 +71,7 @@ plotmesh(coords,ncoord,nnode,connect,nelem,elident,nelnodes,'g');
 %   r           Force vector.  Currently only includes contribution from tractions
 %               acting on element faces (i.e. body forces are neglected)
 %
-  dofs = zeros(ndof*nnode,1);  
+  dofs = zeros(ndof*nnode,1);
 
   K = globalstiffness(ncoord,ndof,nnode,coords,nelem,maxnodes,elident,nelnodes,connect,materialprops,dofs);
 
@@ -101,26 +101,26 @@ plotmesh(coords,ncoord,nnode,connect,nelem,elident,nelnodes,'g');
 % Create a plot of the deformed mesh
 %
 
-  defcoords = zeros(ndof,nnode); 
+  defcoords = zeros(ndof,nnode);
   scalefactor = 1.0;
   for i = 1:nnode
     for j = 1:ndof
-       defcoords(j,i) = coords(j,i) + scalefactor*dofs(ndof*(i-1)+j); 
+       defcoords(j,i) = coords(j,i) + scalefactor*dofs(ndof*(i-1)+j);
     end
   end
 
  figure
  plotmesh(coords,ncoord,nnode,connect,nelem,elident,nelnodes,'g');
  hold on
- plotmesh(defcoords,ncoord,nnode,connect,nelem,elident,nelnodes,'r');  
-  
+ plotmesh(defcoords,ncoord,nnode,connect,nelem,elident,nelnodes,'r');
+
  print_results(outfile, ...
     nprops,materialprops,ncoord,ndof,nnode,coords, ...
     nelem,maxnodes,connect,nelnodes,elident, ...
     nfix,fixnodes,ndload,dloads,dofs)
- 
-fclose(outfile); 
-end 
+
+fclose(outfile);
+end
 
 %================= Material Stiffness ==================================
 %
@@ -131,19 +131,19 @@ function C = materialstiffness(ndof,ncoord,strain,materialprops)
 
    mu = materialprops(1);
    nu = materialprops(2);
-   
+
    C = zeros(ndof,ncoord,ndof,ncoord);
-   
-   if (ncoord == 2)   
+
+   if (ncoord == 2)
 
 %  planestrain = 0 => plane stress, planestrain = 1 => plane strain
    planestrain = materialprops(3);
- 
+
      for i = 1:2
        for j = 1:2
          for k = 1:2
            for l = 1:2
-             if (planestrain==1) 
+             if (planestrain==1)
                if (i==j && k==l)
                    C(i,j,k,l) = C(i,j,k,l)+2*mu*nu/(1-2*nu);
                end
@@ -162,10 +162,10 @@ function C = materialstiffness(ndof,ncoord,strain,materialprops)
          end
        end
      end
-     
-   elseif (ncoord == 3) 
 
-     for i = 1:3 
+   elseif (ncoord == 3)
+
+     for i = 1:3
        for j = 1:3
          for k = 1:3
            for l = 1:3
@@ -210,10 +210,10 @@ function stress = materialstress(ndof,ncoord,strain,materialprops)
 %   each element type
 %
 function n = numberofintegrationpoints(ncoord,nelnodes,elident)
-  
-   if (ncoord == 1) 
-     n = nelnodes;   
-   elseif (ncoord == 2) 
+
+   if (ncoord == 1)
+     n = nelnodes;
+   elseif (ncoord == 2)
      if (nelnodes == 3)
          n = 1;
      end
@@ -226,7 +226,7 @@ function n = numberofintegrationpoints(ncoord,nelnodes,elident)
      if (nelnodes == 8)
          n = 9;
      end
-   elseif (ncoord == 3) 
+   elseif (ncoord == 3)
      if (nelnodes == 4)
          n = 1 ;
      end
@@ -240,7 +240,7 @@ function n = numberofintegrationpoints(ncoord,nelnodes,elident)
          n = 27;
      end
    end
-end   
+end
 %
 %====================== INTEGRATION POINTS ==================================
 %
@@ -252,13 +252,13 @@ function xi = integrationpoints(ncoord,nelnodes,npoints,elident)
 %
 %  1D elements
 %
-   if (ncoord == 1) 
-     if (npoints==1) 
+   if (ncoord == 1)
+     if (npoints==1)
        xi(1,1) = 0.;
-     elseif (npoints == 2) 
+     elseif (npoints == 2)
        xi(1,1) = -0.5773502692;
        xi(1,2) = -xi(1,1);
-     elseif (npoints == 3) 
+     elseif (npoints == 3)
        xi(1,1) = -0.7745966692;
        xi(1,2) = 0.0;
        xi(1,3) = -xi(1,1);
@@ -266,22 +266,22 @@ function xi = integrationpoints(ncoord,nelnodes,npoints,elident)
 %
 %  2D elements
 %
-   elseif (ncoord == 2) 
+   elseif (ncoord == 2)
 %
 %    Triangular element
 %
-     if ( nelnodes == 3 || nelnodes == 6 ) 
-       if (npoints == 1) 
+     if ( nelnodes == 3 || nelnodes == 6 )
+       if (npoints == 1)
          xi(1,1) = 1./3.;
          xi(2,1) = 1./3.;
-       elseif (npoints == 3) 
+       elseif (npoints == 3)
          xi(1,1) = 0.6;
          xi(2,1) = 0.2;
          xi(1,2) = 0.2;
          xi(2,2) = 0.6;
          xi(1,3) = 0.2;
          xi(2,3) = 0.2;
-       elseif (npoints == 4) 
+       elseif (npoints == 4)
          xi(1,1) = 1./3.;
          xi(2,1) = 1./3.;
          xi(1,2) = 0.6;
@@ -293,13 +293,13 @@ function xi = integrationpoints(ncoord,nelnodes,npoints,elident)
        end
 %
 %    Rectangular element
-%                  
-     elseif ( nelnodes==4 || nelnodes==8 ) 
+%
+     elseif ( nelnodes==4 || nelnodes==8 )
 
-       if (npoints == 1) 
+       if (npoints == 1)
          xi(1,1) = 0.;
          xi(2,1) = 0.;
-       elseif (npoints == 4) 
+       elseif (npoints == 4)
          xi(1,1) = -0.5773502692;
          xi(2,1) = xi(1,1);
          xi(1,2) = -xi(1,1);
@@ -308,7 +308,7 @@ function xi = integrationpoints(ncoord,nelnodes,npoints,elident)
          xi(2,3) = -xi(1,1);
          xi(1,4) = -xi(1,1);
          xi(2,4) = -xi(1,1);
-       elseif (npoints == 9) 
+       elseif (npoints == 9)
          xi(1,1) = -0.7745966692;
          xi(2,1) = xi(1,1);
          xi(1,2) = 0.0;
@@ -332,16 +332,16 @@ function xi = integrationpoints(ncoord,nelnodes,npoints,elident)
 %
 %   3D elements
 %
-   elseif (ncoord == 3) 
+   elseif (ncoord == 3)
 %
 %  3D elements
 %
-     if (nelnodes == 4 || nelnodes==10 ) 
-       if (npoints == 1) 
+     if (nelnodes == 4 || nelnodes==10 )
+       if (npoints == 1)
          xi(1,1) = 0.25;
          xi(2,1) = 0.25;
          xi(3,1) = 0.25;
-       elseif (npoints == 4) 
+       elseif (npoints == 4)
          xi(1,1) = 0.58541020;
          xi(2,1) = 0.13819660;
          xi(3,1) = xi(2,1);
@@ -355,15 +355,15 @@ function xi = integrationpoints(ncoord,nelnodes,npoints,elident)
          xi(2,4) = xi(2,1);
          xi(3,4) = xi(2,1);
        end
-     elseif ( nelnodes==8 || nelnodes==20 ) 
-       if (npoints == 1) 
+     elseif ( nelnodes==8 || nelnodes==20 )
+       if (npoints == 1)
          xi(1,1) = 0.;
          xi(2,1) = 0.;
          xi(3,1) = 0.;
-       elseif (npoints == 8) 
+       elseif (npoints == 8)
          x1D = [-0.5773502692,0.5773502692];
          for k = 1:2
-           for j = 1:2 
+           for j = 1:2
              for i = 1:2
                n = 4*(k-1) + 2*(j-1) + i;
                xi(1,n) = x1D(i);
@@ -372,7 +372,7 @@ function xi = integrationpoints(ncoord,nelnodes,npoints,elident)
              end
            end
          end
-       elseif (npoints == 27) 
+       elseif (npoints == 27)
          x1D = [-0.7745966692,0.,0.7745966692];
          for k = 1:3
            for j = 1:3
@@ -401,67 +401,67 @@ function w = integrationweights(ncoord,nelnodes,npoints,elident)
 %
 %  1D elements
 %
-   if (ncoord == 1) 
+   if (ncoord == 1)
      if (npoints == 1)
        w(1) = 2.;
-     elseif (npoints == 2) 
+     elseif (npoints == 2)
        w = [1.,1.];
-     elseif (npoints == 3) 
+     elseif (npoints == 3)
        w = [0.555555555,0.888888888,0.555555555];
      end
 %
 %  2D elements
 %
-   elseif (ncoord == 2) 
+   elseif (ncoord == 2)
 %
 %    Triangular element
 %
-     if ( nelnodes == 3 || nelnodes == 6 ) 
-       if (npoints == 1) 
+     if ( nelnodes == 3 || nelnodes == 6 )
+       if (npoints == 1)
          w(1) = 0.5;
-       elseif (npoints == 3) 
+       elseif (npoints == 3)
          w(1) = 1./6.;
          w(2) = 1./6.;
          w(3) = 1./6.;
-       elseif (npoints == 4) 
+       elseif (npoints == 4)
          w = [-27./96.,25./96.,25/96.,25/96.];
        end
 %
 %    Rectangular element
-%                  
-     elseif ( nelnodes==4 || nelnodes==8 ) 
+%
+     elseif ( nelnodes==4 || nelnodes==8 )
 
-       if (npoints == 1) 
+       if (npoints == 1)
          w(1) = 4.;
-       elseif (npoints == 4) 
+       elseif (npoints == 4)
          w = [1.,1.,1.,1.];
-       elseif (npoints == 9 ) 
+       elseif (npoints == 9 )
          w1D = [0.555555555,0.888888888,0.55555555555];
          for j = 1:3
            for i = 1:3
              n = 3*(j-1)+i;
              w(n) = w1D(i)*w1D(j);
            end
-         end    
+         end
        end
-     end 
+     end
 
-   elseif (ncoord == 3) 
+   elseif (ncoord == 3)
 %
 %  3D elements
 %
-     if (nelnodes == 4 || nelnodes==10 ) 
-       if (npoints == 1) 
+     if (nelnodes == 4 || nelnodes==10 )
+       if (npoints == 1)
          w(1) = 1./6.;
-       elseif (npoints == 4) 
+       elseif (npoints == 4)
          w = [1./24.,1./24.,1./24.,1./24.];
        end
-     elseif ( nelnodes==8 || nelnodes==20 ) 
-       if (npoints == 1) 
+     elseif ( nelnodes==8 || nelnodes==20 )
+       if (npoints == 1)
          w(1) = 8.;
-       elseif (npoints == 8) 
+       elseif (npoints == 8)
          w = [1.,1.,1.,1.,1.,1.,1.,1.];
-       elseif (npoints == 27) 
+       elseif (npoints == 27)
          w1D = [0.555555555,0.888888888,0.55555555555];
          for k = 1:3
            for j = 1:3
@@ -469,7 +469,7 @@ function w = integrationweights(ncoord,nelnodes,npoints,elident)
                n = 9*(k-1)+3*(j-1)+i;
                w(n) = w1D(i)*w1D(j)*w1D(k);
              end
-           end    
+           end
          end
        end
      end
@@ -482,17 +482,17 @@ end
 %        Calculates shape functions for various element types
 %
 function N = shapefunctions(nelnodes,ncoord,elident,xi)
- 
+
 
    N = zeros(nelnodes,1);
 %
 %  1D elements
 %
-  if (ncoord == 1) 
-    if (nelnodes==2) 
+  if (ncoord == 1)
+    if (nelnodes==2)
       N(1) = 0.5*(1.+xi(1));
       N(2) = 0.5*(1.-xi(1));
-    elseif (nelnodes == 3) 
+    elseif (nelnodes == 3)
       N(1) = -0.5*xi(1)*(1.-xi(1));
       N(2) =  0.5*xi(1)*(1.+xi(1));
       N(3) = (1.-xi(1))*(1.+xi(1));
@@ -500,15 +500,15 @@ function N = shapefunctions(nelnodes,ncoord,elident,xi)
 %
 %  2D elements
 %
-   elseif (ncoord == 2) 
+   elseif (ncoord == 2)
 %
 %    Triangular element
 %
-     if ( nelnodes == 3 ) 
+     if ( nelnodes == 3 )
        N(1) = xi(1);
        N(2) = xi(2);
-       N(3) = 1.-xi(1)-xi(2);               
-     elseif ( nelnodes == 6 ) 
+       N(3) = 1.-xi(1)-xi(2);
+     elseif ( nelnodes == 6 )
        xi3 = 1.-xi(1)-xi(2);
        N(1) = (2.*xi(1)-1.)*xi(1);
        N(2) = (2.*xi(2)-1.)*xi(2);
@@ -518,13 +518,13 @@ function N = shapefunctions(nelnodes,ncoord,elident,xi)
        N(6) = 4.*xi3*xi(1);
 %
 %    Rectangular element
-%                  
-     elseif ( nelnodes == 4 ) 
+%
+     elseif ( nelnodes == 4 )
        N(1) = 0.25*(1.-xi(1))*(1.-xi(2));
        N(2) = 0.25*(1.+xi(1))*(1.-xi(2));
        N(3) = 0.25*(1.+xi(1))*(1.+xi(2));
        N(4) = 0.25*(1.-xi(1))*(1.+xi(2));
-     elseif (nelnodes == 8) 
+     elseif (nelnodes == 8)
        N(1) = -0.25*(1.-xi(1))*(1.-xi(2))*(1.+xi(1)+xi(2));
        N(2) = 0.25*(1.+xi(1))*(1.-xi(2))*(xi(1)-xi(2)-1.);
        N(3) = 0.25*(1.+xi(1))*(1.+xi(2))*(xi(1)+xi(2)-1.);
@@ -535,14 +535,14 @@ function N = shapefunctions(nelnodes,ncoord,elident,xi)
        N(8) = 0.5*(1.-xi(1))*(1.-xi(2)*xi(2));
      end
 %
-   elseif (ncoord==3) 
+   elseif (ncoord==3)
 
-     if (nelnodes == 4) 
+     if (nelnodes == 4)
        N(1) = xi(1);
        N(2) = xi(2);
        N(3) = xi(3);
        N(4) = 1.-xi(1)-xi(2)-xi(3);
-     elseif (nelnodes == 10) 
+     elseif (nelnodes == 10)
        xi4 = 1.-xi(1)-xi(2)-xi(3);
        N(1) = (2.*xi(1)-1.)*xi(1);
        N(2) = (2.*xi(2)-1.)*xi(2);
@@ -554,7 +554,7 @@ function N = shapefunctions(nelnodes,ncoord,elident,xi)
        N(8) = 4.*xi(1)*xi4;
        N(9) = 4.*xi(2)*xi4;
        N(10) = 4.*xi(3)*xi4;
-     elseif (nelnodes == 8) 
+     elseif (nelnodes == 8)
        N(1) = (1.-xi(1))*(1.-xi(2))*(1.-xi(3))/8.;
        N(2) = (1.+xi(1))*(1.-xi(2))*(1.-xi(3))/8.;
        N(3) = (1.+xi(1))*(1.+xi(2))*(1.-xi(3))/8.;
@@ -563,7 +563,7 @@ function N = shapefunctions(nelnodes,ncoord,elident,xi)
        N(6) = (1.+xi(1))*(1.-xi(2))*(1.+xi(3))/8.;
        N(7) = (1.+xi(1))*(1.+xi(2))*(1.+xi(3))/8.;
        N(8) = (1.-xi(1))*(1.+xi(2))*(1.+xi(3))/8.;
-     elseif (nelnodes == 20) 
+     elseif (nelnodes == 20)
        N(1) = (1.-xi(1))*(1.-xi(2))*(1.-xi(3))*(-xi(1)-xi(2)-xi(3)-2.)/8.;
        N(2) = (1.+xi(1))*(1.-xi(2))*(1.-xi(3))*(xi(1)-xi(2)-xi(3)-2.)/8.;
        N(3) = (1.+xi(1))*(1.+xi(2))*(1.-xi(3))*(xi(1)+xi(2)-xi(3)-2.)/8.;
@@ -598,11 +598,11 @@ function dNdxi = shapefunctionderivs(nelnodes,ncoord,elident,xi)
 %
 % 1D elements
 %
-  if (ncoord == 1) 
-    if (nelnodes==2) 
+  if (ncoord == 1)
+    if (nelnodes==2)
       dNdxi(1,1) = 0.5;
       dNdxi(2,1) = -0.5;
-    elseif (nelnodes == 3) 
+    elseif (nelnodes == 3)
       dNdxi(1,1) = -0.5+xi(1);
       dNdxi(2,1) =  0.5+xi(1);
       dNdxi(3,1) = -2.*xi(1);
@@ -610,16 +610,16 @@ function dNdxi = shapefunctionderivs(nelnodes,ncoord,elident,xi)
 %
 %  2D elements
 %
-   elseif (ncoord == 2) 
+   elseif (ncoord == 2)
 %
 %    Triangular element
 %
-     if ( nelnodes == 3 ) 
+     if ( nelnodes == 3 )
        dNdxi(1,1) = 1.;
        dNdxi(2,2) = 1.;
        dNdxi(3,1) = -1.;
-       dNdxi(3,2) = -1.;               
-     elseif ( nelnodes == 6 ) 
+       dNdxi(3,2) = -1.;
+     elseif ( nelnodes == 6 )
        xi3 = 1.-xi(1)-xi(2);
        dNdxi(1,1) = 4.*xi(1)-1.;
        dNdxi(2,2) = 4.*xi(2)-1.;
@@ -633,8 +633,8 @@ function dNdxi = shapefunctionderivs(nelnodes,ncoord,elident,xi)
        dNdxi(6,2) = 4.*xi3 - 4.*xi(2);
 %
 %    Rectangular element
-%                  
-     elseif ( nelnodes == 4 ) 
+%
+     elseif ( nelnodes == 4 )
        dNdxi(1,1) = -0.25*(1.-xi(2));
        dNdxi(1,2) = -0.25*(1.-xi(1));
        dNdxi(2,1) = 0.25*(1.-xi(2));
@@ -643,7 +643,7 @@ function dNdxi = shapefunctionderivs(nelnodes,ncoord,elident,xi)
        dNdxi(3,2) = 0.25*(1.+xi(1));
        dNdxi(4,1) = -0.25*(1.+xi(2));
        dNdxi(4,2) = 0.25*(1.-xi(1));
-     elseif (nelnodes == 8) 
+     elseif (nelnodes == 8)
        dNdxi(1,1) = 0.25*(1.-xi(2))*(2.*xi(1)+xi(2));
        dNdxi(1,2) = 0.25*(1.-xi(1))*(xi(1)+2.*xi(2));
        dNdxi(2,1) = 0.25*(1.-xi(2))*(2.*xi(1)-xi(2));
@@ -664,16 +664,16 @@ function dNdxi = shapefunctionderivs(nelnodes,ncoord,elident,xi)
 %
 %    3D elements
 %
-   elseif (ncoord==3) 
+   elseif (ncoord==3)
 
-     if (nelnodes == 4) 
+     if (nelnodes == 4)
        dNdxi(1,1) = 1.;
        dNdxi(2,2) = 1.;
        dNdxi(3,3) = 1.;
        dNdxi(4,1) = -1.;
        dNdxi(4,2) = -1.;
        dNdxi(4,3) = -1.;
-     elseif (nelnodes == 10) 
+     elseif (nelnodes == 10)
        xi4 = 1.-xi(1)-xi(2)-xi(3);
        dNdxi(1,1) = (4.*xi(1)-1.);
        dNdxi(2,2) = (4.*xi(2)-1.);
@@ -686,7 +686,7 @@ function dNdxi = shapefunctionderivs(nelnodes,ncoord,elident,xi)
        dNdxi(6,2) = 4.*xi(3);
        dNdxi(6,3) = 4.*xi(2);
        dNdxi(7,1) = 4.*xi(3);
-       dNdxi(7,3) = 4.*xi(1); 
+       dNdxi(7,3) = 4.*xi(1);
        dNdxi(8,1) = 4.*(xi4-xi(1));
        dNdxi(8,2) = -4.*xi(1);
        dNdxi(8,3) = -4.*xi(1);
@@ -696,7 +696,7 @@ function dNdxi = shapefunctionderivs(nelnodes,ncoord,elident,xi)
        dNdxi(10,1) = -4.*xi(3)*xi4;
        dNdxi(10,2) = -4.*xi(3);
        dNdxi(10,3) = 4.*(xi4-xi(3));
-     elseif (nelnodes == 8) 
+     elseif (nelnodes == 8)
        dNdxi(1,1) = -(1.-xi(2))*(1.-xi(3))/8.;
        dNdxi(1,2) = -(1.-xi(1))*(1.-xi(3))/8.;
        dNdxi(1,3) = -(1.-xi(1))*(1.-xi(2))/8.;
@@ -721,7 +721,7 @@ function dNdxi = shapefunctionderivs(nelnodes,ncoord,elident,xi)
        dNdxi(8,1) = -(1.+xi(2))*(1.+xi(3))/8.;
        dNdxi(8,2) = (1.-xi(1))*(1.+xi(3))/8.;
        dNdxi(8,3) = (1.-xi(1))*(1.+xi(2))/8.;
-     elseif (nelnodes == 20) 
+     elseif (nelnodes == 20)
        dNdxi(1,1) = (-(1.-xi(2))*(1.-xi(3))*(-xi(1)-xi(2)-xi(3)-2.)-(1.-xi(1))*(1.-xi(2))*(1.-xi(3)))/8.;
        dNdxi(1,2) = (-(1.-xi(1))*(1.-xi(3))*(-xi(1)-xi(2)-xi(3)-2.)-(1.-xi(1))*(1.-xi(2))*(1.-xi(3)))/8.;
        dNdxi(1,3) = (-(1.-xi(1))*(1.-xi(2))*(-xi(1)-xi(2)-xi(3)-2.)-(1.-xi(1))*(1.-xi(2))*(1.-xi(3)))/8.;
@@ -827,7 +827,7 @@ function kel = elstif(ncoord,ndof,nelnodes,elident,coord,materialprops,displacem
    strain = zeros(ndof,ncoord);
    kel = zeros(ndof*nelnodes,ndof*nelnodes);
 %
-%  Set up integration points && weights    
+%  Set up integration points && weights
 %
    xilist = integrationpoints(ncoord,nelnodes,npoints,elident);
    w = integrationweights(ncoord,nelnodes,npoints,elident);
@@ -840,11 +840,11 @@ function kel = elstif(ncoord,ndof,nelnodes,elident,coord,materialprops,displacem
 %
       for i = 1:ncoord
         xi(i) = xilist(i,intpt);
-      end      
+      end
       N = shapefunctions(nelnodes,ncoord,elident,xi);
       dNdxi = shapefunctionderivs(nelnodes,ncoord,elident,xi);
 
-      
+
 %
 %     Compute the jacobian matrix && its determinant
 %
@@ -856,7 +856,7 @@ function kel = elstif(ncoord,ndof,nelnodes,elident,coord,materialprops,displacem
           end
         end
       end
-      
+
       dxidx = inv(dxdxi);
       dt = det(dxdxi);
 %
@@ -892,7 +892,7 @@ function kel = elstif(ncoord,ndof,nelnodes,elident,coord,materialprops,displacem
       dsde = materialstiffness(ndof,ncoord,strain,materialprops);
 %
 %     Compute the element stiffness
-%             
+%
       for a = 1:nelnodes
         for i = 1:ndof
           for b = 1:nelnodes
@@ -920,13 +920,13 @@ end
 %   the surface integrals associated with the element traction vector
 %
 function n = nfacenodes(ncoord,nelnodes,elident,face)
-   if (ncoord == 2) 
+   if (ncoord == 2)
      if (nelnodes == 3 || nelnodes == 4)
          n = 2;
      elseif (nelnodes == 6 || nelnodes == 8)
          n=3;
      end
-   elseif (ncoord == 3) 
+   elseif (ncoord == 3)
      if (nelnodes == 4)
          n = 3;
      elseif (nelnodes == 10)
@@ -947,28 +947,28 @@ end
 function list = facenodes(ncoord,nelnodes,elident,face)
 
    i3 = [2,3,1];
-   i4 = [2,3,4,1]; 
+   i4 = [2,3,4,1];
 
    list = zeros(nfacenodes(ncoord,nelnodes,face),1);
 
-   if (ncoord == 2) 
-     if (nelnodes == 3) 
+   if (ncoord == 2)
+     if (nelnodes == 3)
        list(1) = face;
        list(2) = i3(face);
-     elseif (nelnodes == 6) 
+     elseif (nelnodes == 6)
        list(1) = face;
        list(2) = i3(face);
        list(3) = face+3;
-     elseif (nelnodes==4) 
+     elseif (nelnodes==4)
        list(1) = face;
        list(2) = i4(face);
-     elseif (nelnodes==8) 
+     elseif (nelnodes==8)
        list(1) = face;
        list(2) = i4(face);
        list(3) = face+4;
      end
-   elseif (ncoord == 3) 
-     if (nelnodes==4) 
+   elseif (ncoord == 3)
+     if (nelnodes==4)
        if   (face == 1)
            list = [1,2,3];
        elseif (face == 2)
@@ -978,7 +978,7 @@ function list = facenodes(ncoord,nelnodes,elident,face)
        elseif (face == 4)
            list = [3,4,1];
        end
-     elseif (nelnodes == 10) 
+     elseif (nelnodes == 10)
        if   (face == 1)
            list = [1,2,3,5,6,7];
        elseif (face == 2)
@@ -988,7 +988,7 @@ function list = facenodes(ncoord,nelnodes,elident,face)
        elseif (face == 4)
            list = [3,4,1,10,8,7];
        end
-     elseif (nelnodes == 8) 
+     elseif (nelnodes == 8)
        if   (face == 1)
            list = [1,2,3,4];
        elseif (face == 2)
@@ -1002,7 +1002,7 @@ function list = facenodes(ncoord,nelnodes,elident,face)
        elseif (face == 6)
            list = [4,8,5,1];
        end
-     elseif (nelnodes == 20)  
+     elseif (nelnodes == 20)
        if   (face == 1)
            list = [1,2,3,4,9,10,11,12];
        elseif (face == 2)
@@ -1028,7 +1028,7 @@ function r = eldload(ncoord,ndof,nfacenodes,elident,coords,traction)
   xi = zeros(ncoord-1,1);
   dxdxi = zeros(ncoord,ncoord-1);
   r = zeros(ndof*nfacenodes,1);
-   
+
   xilist = integrationpoints(ncoord-1,nfacenodes,npoints);
   w = integrationweights(ncoord-1,nfacenodes,npoints);
 
@@ -1051,9 +1051,9 @@ function r = eldload(ncoord,ndof,nfacenodes,elident,coords,traction)
         end
       end
     end
-    if (ncoord == 2) 
+    if (ncoord == 2)
       dt = sqrt(dxdxi(1,1)^2+dxdxi(2,1)^2);
-    elseif (ncoord == 3) 
+    elseif (ncoord == 3)
       dt = sqrt( ((dxdxi(2,1)*dxdxi(3,2))-(dxdxi(2,2)*dxdxi(3,1)))^2 ...
           + ((dxdxi(1,1)*dxdxi(3,2))-(dxdxi(1,2)*dxdxi(3,1)))^2 ...
           + ((dxdxi(1,1)*dxdxi(2,2))-(dxdxi(1,2)*dxdxi(2,1)))^2 );
@@ -1127,8 +1127,8 @@ function r = globaltraction(ncoord,ndof,nnodes,ndload,coords,nelnodes,elident,co
       face = dloads(2,load);
       n = nelnodes(lmn);
       ident = elident(lmn);
-      nfnodes = nfacenodes(ncoord,n,ident,face); 
-      nodelist = facenodes(ncoord,n,ident,face);     
+      nfnodes = nfacenodes(ncoord,n,ident,face);
+      nodelist = facenodes(ncoord,n,ident,face);
       lmncoord = zeros(ncoord,nfnodes);
       for a = 1:nfnodes
         for i = 1:ncoord
@@ -1157,7 +1157,7 @@ function r = globaltraction(ncoord,ndof,nnodes,ndload,coords,nelnodes,elident,co
      end
 
    end
-end       
+end
 
 function print_results(outfile, ...
     nprops,materialprops,ncoord,ndof,nnode,coords, ...
@@ -1166,13 +1166,13 @@ function print_results(outfile, ...
 %      Print nodal displacements, element strains && stresses:a file
 
 fprintf(outfile,'Nodal Displacements: \n');
-   if (ndof == 2) 
+   if (ndof == 2)
      fprintf(outfile,' Node      Coords         u1       u2 \n');
      for i = 1:nnode
       fprintf(outfile,'%3d %8.4f %8.4f %8.4f %8.4f\n', ...
                                i,coords(1,i),coords(2,i),dofs(2*i-1),dofs(2*i));
      end
-   elseif (ndof == 3) 
+   elseif (ndof == 3)
      fprintf(outfile,' Node            Coords            u1       u2       u3 \n');
      for i = 1:nnode
       fprintf(outfile,'%3d %8.4f %8.4f %8.4f %8.4f %8.4f %8.4f \n', ...
@@ -1192,10 +1192,10 @@ fprintf(outfile,'Nodal Displacements: \n');
    for lmn = 1:nelem
 
     fprintf(outfile,' \n Element; %d ',lmn);
-    if (ncoord == 2)   
+    if (ncoord == 2)
     fprintf(outfile,'  \n int pt    Coords          e_11      e_22     e_12      s_11       s_22      s_12 \n');
 
-    elseif (ncoord == 3) 
+    elseif (ncoord == 3)
     fprintf(outfile,'\n int pt         Coords            e_11      e_22     e_33      e_12       e_13      e_23      s_11      s_22      s_33      s_12      s_13      s_23 \n');
     end
 %
@@ -1211,7 +1211,7 @@ fprintf(outfile,'Nodal Displacements: \n');
       end
       n = nelnodes(lmn);
       ident = elident(lmn);
- 
+
       npoints = numberofintegrationpoints(ncoord,n);
       dNdx = zeros(n,ncoord);
       dxdxi = zeros(ncoord,ncoord);
@@ -1219,7 +1219,7 @@ fprintf(outfile,'Nodal Displacements: \n');
       xi = zeros(ncoord,1);
       x = zeros(ncoord,1);
 %
-%  Set up integration points 
+%  Set up integration points
 %
       xilist = integrationpoints(ncoord,n,npoints);
 %
@@ -1232,7 +1232,7 @@ fprintf(outfile,'Nodal Displacements: \n');
        for i = 1:ncoord
          xi(i) = xilist(i,intpt);
        end
-       N = shapefunctions(n,ncoord,ident,xi);      
+       N = shapefunctions(n,ncoord,ident,xi);
        dNdxi = shapefunctionderivs(n,ncoord,ident,xi);
 %
 %     Compute the coords of the integration point
@@ -1281,13 +1281,13 @@ fprintf(outfile,'Nodal Displacements: \n');
 
       stress = materialstress(ndof,ncoord,strain,materialprops);
 
-      if (ncoord == 2) 
+      if (ncoord == 2)
 
       fprintf(outfile,'%5d %7.4f %7.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f \n', ...
         intpt,x(1),x(2),strain(1,1),strain(2,2),strain(1,2),stress(1,1),stress(2,2),stress(1,2));
 
 
-      elseif (ncoord == 3) 
+      elseif (ncoord == 3)
 
       fprintf(outfile,'%5d %7.4f %7.4f %7.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f %9.4f \n',...
               intpt,x(1),x(2),x(3), ...
@@ -1300,7 +1300,7 @@ end
 
 %==============================Function read_input_file =================
  function [nprops,materialprops,ncoord,ndof,nnode,coords,nelem,maxnodes, ...
-                connect,nelnodes,elident,nfix,fixnodes,ndload,dloads] = read_input_file(infile) 
+                connect,nelnodes,elident,nfix,fixnodes,ndload,dloads] = read_input_file(infile)
 
  cellarray=textscan(infile,'%s');
 
@@ -1310,7 +1310,7 @@ end
    materialprops = zeros(nprops,1);
    cellno = 2;
    for i = 1:nprops
-     cellno = cellno + 2;  
+     cellno = cellno + 2;
      materialprops(i) = str2num(cellarray{1}{cellno});
    end;
 %
@@ -1322,7 +1322,7 @@ end
    ndof = str2num(cellarray{1}{cellno});
    cellno = cellno + 2;
    nnode = str2num(cellarray{1}{cellno});
- 
+
    coords = zeros(ncoord,nnode);
    cellno = cellno + 1;
    for i = 1 : nnode
@@ -1354,7 +1354,7 @@ end
    end
 %
 %    No. nodes with prescribed displacements, with the prescribed displacements
-% 
+%
    cellno = cellno + 2;
    nfix = str2num(cellarray{1}{cellno});
    cellno = cellno + 3;
@@ -1384,10 +1384,10 @@ end
          dloads(j+2,i) = str2num(cellarray{1}{cellno});
        end;
     end;
-    
+
  end
   function plotmesh(coords,ncoord,nnode,connect,nelem,elident,nelnodes,color)
-% Function to plot a mesh.  
+% Function to plot a mesh.
     f2D_3 = [1,2,3];
     f2D_4 = [1,2,3,4];
     f2D_6 = [1,4,2,5,3,6];
@@ -1406,11 +1406,11 @@ end
                x(i,1:2) = coords(1:2,connect(i,lmn));
            end
            scatter(x(:,1),x(:,2),'MarkerFaceColor','r');
-           if (nelnodes(lmn)==3) 
+           if (nelnodes(lmn)==3)
                patch('Vertices',x,'Faces',f2D_3,'FaceColor','none','EdgeColor',color);
            elseif (nelnodes(lmn)==4)
                patch('Vertices',x,'Faces',f2D_4,'FaceColor','none','EdgeColor',color);
-           elseif (nelnodes(lmn)==6) 
+           elseif (nelnodes(lmn)==6)
                patch('Vertices',x,'Faces',f2D_6,'FaceColor','none','EdgeColor',color);
            elseif (nelnodes(lmn)==8 || nelnodes(lmn)==9)
                patch('Vertices',x,'Faces',f2D_8,'FaceColor','none','EdgeColor',color);
@@ -1422,18 +1422,17 @@ end
                x(i,1:3) = coords(1:3,connect(i,lmn));
            end
            scatter3(x(:,1),x(:,2),x(:,3),'MarkerFaceColor','r');
-           if (nelnodes(lmn)==4) 
+           if (nelnodes(lmn)==4)
                patch('Vertices',x,'Faces',f3D_4,'FaceColor','none','EdgeColor',color);
            elseif (nelnodes(lmn)==10)
                patch('Vertices',x,'Faces',f3D_10,'FaceColor','none','EdgeColor',color);
-           elseif (nelnodes(lmn)==8) 
+           elseif (nelnodes(lmn)==8)
                patch('Vertices',x,'Faces',f3D_8,'FaceColor','none','EdgeColor',color);
            elseif (nelnodes(lmn)==20)
                patch('Vertices',x,'Faces',f3D_20,'FaceColor','none','EdgeColor',color);
            end
-       end    
+       end
    end
    axis equal
    hold off
 end
- 
