@@ -6,9 +6,9 @@ def readinput(inp_fpath):
 
     with open(inp_fpath, 'r') as f:
         content = f.read()
-    
+
     nodes, elements = content.lower().split('*node\n')[1].split('*element\n')
-    
+
     # nodes = np.array(lines[node_start:node_end])
     # elements = np.array(lines[element_start:])
     nodes = np.loadtxt(StringIO(nodes), delimiter=',')
@@ -40,11 +40,11 @@ def shape_func(xi, nnodes_el, ndim):
         N = np.array([(1-xi)/2, (1+xi)/2])
     else:
         raise f'Model does not support ndim={ndim} and nnodes_el={nnodes_el}'
-    
+
     return N
 
 
-def shape_func_dev(xi, nnodes_el, ndim):
+def shape_func_deriv(xi, nnodes_el, ndim):
 
     # x.T*shape_dev gives dx/dxi
     dNdxi = np.zeros((nnodes_el, ndim))
@@ -89,7 +89,7 @@ def mat_stiffness(eps_, nnodes_el, ndim, E=201000, nu=0.3):
 
 
 def integration_points_weights(nnodes_el, ndim, reduced=False):
-    
+
     if ndim ==3 and nnodes_el == 8:
         if reduced:
             xi = np.array([0, 0, 0])
@@ -116,12 +116,12 @@ def element_stiffness(nodes, element, displacements, nnodes_el, ndim):
     xi_list, w = integration_points_weights(nnodes_el, ndim, reduced=False)
     K_e = np.zeros((ndim*nnodes_el, ndim*nnodes_el))
 
-    node_num = element  
+    node_num = element
     xs_node = nodes[node_num]                # (nnodes_el x ndim)
     for ii, xi in enumerate(xi_list):
         # This part are performed at the integration point
         # xs_int  = xs_node.T@shape_func(xi, nnodes_el, ndim)    # (ndim x 1) integration point coords
-        dNdxi = shape_func_dev(xi, nnodes_el, ndim)            # (nnodes_el x ndim)
+        dNdxi = shape_func_deriv(xi, nnodes_el, ndim)            # (nnodes_el x ndim)
         dxdxi = xs_node.T@dNdxi               # (ndim x ndim)
         dxidx = np.linalg.inv(dxdxi)          # (ndim x ndim)
         dNdx  = dNdxi@dxidx                   # (nnodes_el x ndim)
@@ -129,7 +129,7 @@ def element_stiffness(nodes, element, displacements, nnodes_el, ndim):
 
         eps_ = 1/2*(displacements.T@dNdx + dNdx.T@displacements)  # This line projects displacement at the nodes to the strain at the integration point
         dsde = mat_stiffness(eps_, nnodes_el, ndim)
-        
+
         for A in range(nnodes_el):
             for i in range(ndim):
                 for B in range(nnodes_el):
@@ -150,7 +150,7 @@ def global_stiffness(nodes, elements, displacements, nnodes, ndim):
                 for j,node2 in enumerate(node_num):
                     for dim2 in range(ndim):
                         K_global[ndim*node1+dim1, ndim*node2+dim2] += K_e[ndim*i+dim1, ndim*j+dim2]
-    
+
     return K_global
 
 
