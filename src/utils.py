@@ -1,5 +1,4 @@
 import numpy as np
-from io import StringIO
 
 
 def read_inp(inp_fpath, inp_format):
@@ -336,8 +335,80 @@ def integration_points_weights(nnodes_el, ndim, reduced=False):
                         xi[n] = [x1D[i], x1D[j], x1D[k]]
             w = np.array([1.,1.,1.,1.,1.,1.,1.,1.])
 
-
     return xi, w
+
+
+def element_matrices(model):
+
+    nnodes_el, ndim = model.nnodes_el, model.ndim
+    xi_list, w = integration_points_weights(nnodes_el, ndim, reduced=False)
+    K_e = np.zeros((model.nel, nnodes_el*ndim, nnodes_el*ndim))
+    f_e = np.zeros((model.nel, nnodes_el*ndim))
+
+    for iel, element in enumerate(model.elements):
+        node_num = element
+        xs_node = model.nodes[node_num]                # (nnodes_el x ndim)
+        for ixi, xi in enumerate(xi_list):
+            # This part are performed at the integration point
+            # xs_int  = xs_node.T@shape_func(xi, nnodes_el, ndim)    # (ndim x 1) integration point coords
+            N = shape_func(xi, nnodes_el, ndim)            # (nnodes_el x ndim)
+            dNdxi = shape_func_deriv(xi, nnodes_el, ndim)            # (nnodes_el x ndim)
+            dxdxi = xs_node.T@dNdxi               # (ndim x ndim)
+            # dxidx = np.linalg.inv(dxdxi)          # (ndim x ndim)
+            # dNdx  = dNdxi@dxidx                   # (nnodes_el x ndim)
+            J = np.linalg.det(dxdxi)
+            for inode, dNdxi_inode in enumerate(dNdxi):  # inode is the i-th node in the element
+                ind_i = inode*ndim
+
+                # Element force vector
+                bf = model.body_force[iel]  # (ndim x 1)
+                f_e[iel, ind_i:ind_i+ndim] += bf * w[ixi]*N[inode]*J  # (ndim x 1)
+
+                for jnode, dNdxi_jnode in enumerate(dNdxi):
+                    ind_j = jnode*ndim
+
+                    # Element stiffness matrix
+                    K_e[iel, ind_i:ind_i+ndim, ind_j:ind_j+ndim] += w[ixi]/J*model.E*np.outer(dNdxi_inode, dNdxi_jnode)  # (ndim x ndim)
+
+    return K_e, f_e
+
+
+def global_matrices(model, K_e, f_e):
+
+    nnodes, ndim = model.nnodes, model.ndim
+    K_global = np.zeros((nnodes*ndim, nnodes*ndim))
+    f_global = np.zeros((nnodes*ndim))
+
+    for iel, element in enumerate(model.elements):
+        node_num = element
+        # xs_node = model.nodes[node_num]                # (nnodes_el x ndim)
+        for inode, nodei in enumerate(node_num):  # nodei is the node number, inode is the i-th node in element definition
+            ind_ii, ind_i = nodei*ndim, inode*ndim
+            f_global[ind_ii:ind_ii+ndim] += f_e[iel, ind_i:ind_i+ndim]
+
+            for jnode, nodej in enumerate(node_num):
+                ind_jj, ind_j = nodej*ndim, jnode*ndim
+                K_global[ind_ii:ind_ii+ndim, ind_jj:ind_jj+ndim] += K_e[iel, ind_i:ind_i+ndim, ind_j:ind_j+ndim]
+
+    return K_global, f_global
+
+
+def apply_boundary_conditions(model, K_global, f_global):
+
+    # Update the global force vector with the traction term
+    K_mod, f_mod = K_global, f_global
+    for traction in model.traction:
+        node = int(traction[0])
+        f_mod[node:node+model.ndim] += traction[1:]
+
+    # Displacement boundary conditions
+    for BC in model.BC:
+        row = int(BC[0]*model.ndim + BC[1])
+        K_mod[row,:] = 0
+        K_mod[row,row] = 1
+        f_mod[row] = BC[2]
+
+    return K_mod, f_mod
 
 
 if __name__ == '__main__':
