@@ -1,4 +1,4 @@
-# fea_fundamentals
+# QFEA
 
 
 ## Files for Bower's sample code

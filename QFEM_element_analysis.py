@@ -2,11 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
-def shape_func(el_type, xi, nnodes_el):
+def shape_func(el_type, xi, nelnodes):
     # Shape function sequence should be in accordance with the node sequence in element connectivity!
 
     # xi (1 x ndim) is the local coordinate
-    N = np.zeros(nnodes_el)
+    N = np.zeros(nelnodes)
     if 'C3D8' in el_type:
         for n_local in range(1,9):
             T1 = 1-xi[0] if n_local in [1, 4, 5, 8] else 1+xi[0]
@@ -30,17 +30,17 @@ def shape_func(el_type, xi, nnodes_el):
         N[4] = 4.*xi[1]*xi2
         N[5] = 4.*xi2*xi[0]
     else:
-        raise f'Element type {el_type} is not supported yet'
+        raise Exception(f'Element type {el_type} is not supported yet')
 
     return np.array(N)
 
 
-def shape_func_dev(el_type, xi, nnodes_el, ndim):
+def shape_func_dev(el_type, xi, nelnodes, ndim):
     # Shape function sequence should be in accordance with the node sequence in element connectivity!
 
     # xi (1 x ndim) is the local coordinate
-    # dNdxi is (nnodes_el x ndim)
-    dNdxi = np.zeros((nnodes_el, ndim))
+    # dNdxi is (nelnodes x ndim)
+    dNdxi = np.zeros((nelnodes, ndim))
     if 'C3D8' in el_type:
         dNdxi[0] = [-(1-xi[1])*(1-xi[2]), -(1-xi[0])*(1-xi[2]), -(1-xi[0])*(1-xi[1])]
         dNdxi[1] = [ (1-xi[1])*(1-xi[2]), -(1+xi[0])*(1-xi[2]), -(1+xi[0])*(1-xi[1])]
@@ -63,7 +63,7 @@ def shape_func_dev(el_type, xi, nnodes_el, ndim):
     # elif 'C2D6' in el_type:
 
     else:
-        raise f'Element type {el_type} is not supported yet'
+        raise Exception(f'Element type {el_type} is not supported yet')
 
     return np.array(N)
 

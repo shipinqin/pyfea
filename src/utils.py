@@ -8,7 +8,7 @@ def read_inp(inp_fpath, inp_format):
     model = {}
     # If the input file is ABAQUS inp style
     if inp_format == 'abq':
-        nodes, elements, ndim, nnodes, nnodes_el, nel = read_abq_inp(inp_fpath)
+        nodes, elements, ndim, nnodes, nelnodes, nel = read_abq_inp(inp_fpath)
 
         nint =2
         nshape = 3
@@ -42,13 +42,14 @@ def read_inp(inp_fpath, inp_format):
         E = const
 
     elif inp_format == 'bower':
-        nodes, elements, ndim, nnodes, nnodes_el, nel, props, BCs, tractions = read_bower_inp(inp_fpath)
+        nodes, elements, ndim, nnodes, nelnodes, nel, props, BCs, tractions, body_force = read_bower_inp(inp_fpath)
         if len(props) == 3:
-            props = {'G': props[0],
-                     'mu': props[1],
+            props = {'mu': props[0],
+                     'nu': props[1],
                      'PSPE': props[2]}  # according to Bower, 0 means PS, 1 means PE
+            props.update({'E': 2*props['mu']*(1+props['nu'])})
 
-    return nodes, elements, ndim, nnodes, nnodes_el, nel, props, BCs, tractions
+    return nodes, elements, ndim, nnodes, nelnodes, nel, props, BCs, tractions, body_force
 
 
 def get_value(line, type_):
@@ -103,9 +104,11 @@ def read_abq_inp(inp_fpath):
                     elements[element_id] = node_ids
 
         ndim, nnodes = len(nodes.values[0]), len(nodes)
-        nnodes_el, nel = len(elements.values[0]), len(elements)
+        nelnodes, nel = len(elements.values[0]), len(elements)
 
-    return nodes, elements, ndim, nnodes, nnodes_el, nel
+        body_force = None
+
+    return nodes, elements, ndim, nnodes, nelnodes, nel
 
 
 def read_bower_inp(inp_fpath):
@@ -119,6 +122,7 @@ def read_bower_inp(inp_fpath):
 
         i = 0
 
+        # Material properties
         nprops = get_value(lines[i], 'int')
         props = np.zeros(nprops)
         i += 1
@@ -127,67 +131,81 @@ def read_bower_inp(inp_fpath):
             props[j] = get_value(lines[i+j], 'float')
         i += nprops
 
+        # Basic model info
         ndim = get_value(lines[i], 'int')
         ndof = get_value(lines[i+1], 'int')
         nnodes = get_value(lines[i+2], 'int')
         i += 4
 
+        # Node definition
         nodes = lines[i:i+nnodes]
         nodes = np.array([node.strip().split() for node in nodes]).astype('float')
         if len(nodes[0]) != ndim:
             raise Exception('Wrong input in node definition')
         i += nnodes
 
+        # element info
         nel = get_value(lines[i], 'int')
-        nnodes_el = get_value(lines[i+1], 'int')
+        nelnodes = get_value(lines[i+1], 'int')
         i += 3
 
+        # Element definition
         elements = lines[i:i+nel]
         elements = np.array([element.strip().split() for element in elements]).astype('int')
         el_identifier = elements[:,0]
-        nnodes_els = elements[:,1]
-        elements = elements[:,2:]
-        if len(np.unique(nnodes_els)) != 1 or nnodes_els[0] != nnodes_el:
+        nelnodes_all = elements[:,1]
+        elements = elements[:,2:] -1  # -1 because Python is 0-indexed
+        if len(np.unique(nelnodes_all)) != 1 or nelnodes_all[0] != nelnodes:
             raise Exception('Wrong number of nodes in element definition')
         i += nel
 
+        # BC
         nBCs = get_value(lines[i], 'int')
         i += 2
 
+        # list of [Node_#, DOF#, Value]
         BCs = lines[i:i+nBCs]
         BCs = np.array([BC.strip().split() for BC in BCs]).astype('float')
+        BCs[:2,0] -= 1  # Python is 0-indexed
         i += nBCs
 
+        # Traction
         ntraction = get_value(lines[i], 'int')
         i += 2
 
+        # list of [Element_#, Face_#, Traction_components]
         tractions = lines[i:i+ntraction]
         tractions = np.array([traction.strip().split() for traction in tractions]).astype('float')
+        tractions[:,:2] -= 1  # Python is 0-indexed
 
-    return nodes, elements, ndim, nnodes, nnodes_el, nel, props, BCs, tractions
+        # dict of [Element_#: force vector] force vector: ndim x 1
+        body_force = None
+
+    return nodes, elements, ndim, nnodes, nelnodes, nel, props, BCs, tractions, body_force
 
 
-def shape_func(xi, nnodes_el, ndim):
+def shape_func(xi, nelnodes, ndim):
 
     # Shape function sequence should be in accordance with the node sequence in element connectivity!
 
     # xi (1 x ndim) is the local coordinate
-    N = np.zeros(nnodes_el)
+    N = np.zeros(nelnodes)
 
     # ------------------------------
     # 1D elements
     if ndim == 1:
-        if nnodes_el == 2:  # C1D2
+        if nelnodes == 2:  # C1D2
             N = np.array([(1-xi)/2, (1+xi)/2])
-        elif nnodes_el == 3:  # C1D3
+        elif nelnodes == 3:  # C1D3
             N = np.array([-xi*(1-xi)/2, xi*(1+xi)/2, (1-xi)*(1+xi)])
+        return N
 
     # ------------------------------
     # 2D elements
     if ndim == 2:
-        if nnodes_el == 3:  # 1st order triangle
+        if nelnodes == 3:  # 1st order triangle
             N = np.array([xi[0], xi[1], 1-xi[0]-xi[1]])
-        elif nnodes_el == 6:  # 2nd order triangle
+        elif nelnodes == 6:  # 2nd order triangle
             xi2 = 1-xi[0]-xi[1]
             N[0] = (2*xi[0]-1)*xi[0]
             N[1] = (2*xi[1]-1)*xi[1]
@@ -195,12 +213,12 @@ def shape_func(xi, nnodes_el, ndim):
             N[3] = 4*xi[0]*xi[1]
             N[4] = 4*xi[1]*xi2
             N[5] = 4*xi[0]*xi2
-        elif nnodes_el == 4:  # 1st order quad
+        elif nelnodes == 4:  # 1st order quad
             N[0] = (1-xi[0])*(1-xi[1])/4
             N[1] = (1+xi[0])*(1-xi[1])/4
             N[2] = (1+xi[0])*(1+xi[1])/4
             N[3] = (1-xi[0])*(1+xi[1])/4
-        elif nnodes_el == 8:  # 2nd order quad
+        elif nelnodes == 8:  # 2nd order quad
             N[0] = -(1-xi[0])*(1-xi[1])*(1+xi[0]+xi[1])/4
             N[1] = (1+xi[0])*(1-xi[1])*(xi[0]-xi[1]-1)/4
             N[2] = (1+xi[0])*(1+xi[1])*(xi[0]+xi[1]-1)/4
@@ -209,46 +227,45 @@ def shape_func(xi, nnodes_el, ndim):
             N[5] = (1+xi[0])*(1-xi[1]*xi[1])/2
             N[6] = (1-xi[0]*xi[0])*(1+xi[1])/2
             N[7] = (1-xi[0])*(1-xi[1]*xi[1])/2
+        return N
 
     # ------------------------------
     # 3D elements
     if ndim == 3:
-        if nnodes_el == 8:  # C3D8
+        if nelnodes == 8:  # C3D8
             for n_local in range(1,9):
                 T1 = 1-xi[0] if n_local in [1, 4, 5, 8] else 1+xi[0]
                 T2 = 1-xi[1] if n_local in [1, 2, 5, 6] else 1+xi[1]
                 T3 = 1-xi[2] if n_local in [1, 2, 3, 4] else 1+xi[2]
                 N[n_local-1] = 1/8*T1*T2*T3
+        return N
 
-    else:
-        raise f'Model does not support ndim={ndim} and nnodes_el={nnodes_el}'
-
-    return N
+    raise Exception(f'Model does not support ndim={ndim} and nelnodes={nelnodes}')
 
 
-def shape_func_deriv(xi, nnodes_el, ndim):
+def shape_func_deriv(xi, nelnodes, ndim):
 
     # Shape function sequence should be in accordance with the node sequence in element connectivity!
 
     # x.T*shape_dev gives dx/dxi
-    dNdxi = np.zeros((nnodes_el, ndim))
+    dNdxi = np.zeros((nelnodes, ndim))
 
     # ------------------------------
     # 1D elements
     if ndim == 1:
-        if nnodes_el == 2:  # C1D2
+        if nelnodes == 2:  # C1D2
             dNdxi = np.array([[-1/2], [1/2]])
-        elif nnodes_el == 3:  # C1D3
+        elif nelnodes == 3:  # C1D3
             dNdxi = np.array([xi-1/2, xi+1/2, -2*xi])
 
     # ------------------------------
     # 2D elements
     elif ndim == 2:
-        if nnodes_el == 3:  # 1st order triangle
+        if nelnodes == 3:  # 1st order triangle
             dNdxi[0] = [1, 0]
             dNdxi[1] = [0, 1]
             dNdxi[2] = [-1, -1]
-        elif nnodes_el == 6:  # 2nd order triangle
+        elif nelnodes == 6:  # 2nd order triangle
             xi2 = 1-xi[0]-xi[1]
             dNdxi[0] = [4*xi[0]-1, 0]
             dNdxi[1] = [0, 4*xi[1]-1]
@@ -257,12 +274,12 @@ def shape_func_deriv(xi, nnodes_el, ndim):
             dNdxi[4] = [-4*xi[1], 4*(xi2-xi[1])]
             dNdxi[5] = [4*(xi2-xi[0]), -4*xi[0]]
             # In Bower's code, dNdxi[4] and dNdxi[5] are wrong
-        elif nnodes_el == 4:  # 1st order quad
+        elif nelnodes == 4:  # 1st order quad
             dNdxi[0] = [-(1-xi[1])/4, -(1-xi[0])/4]
             dNdxi[1] = [(1-xi[1])/4, -(1+xi[0])/4]
             dNdxi[2] = [(1+xi[1])/4, (1+xi[0])/4]
             dNdxi[3] = [-(1+xi[1])/4, (1-xi[0])/4]
-        elif nnodes_el == 8:  # 2nd order quad
+        elif nelnodes == 8:  # 2nd order quad
             dNdxi[0] = [(1-xi[1]*(2*xi[0]+xi[1]))/4, (1-xi[0]*(xi[0]+2*xi[1]))/4]
             dNdxi[1] = [(1-xi[1]*(2*xi[0]-xi[1]))/4, (1+xi[0]*(-xi[0]+2*xi[1]))/4]
             dNdxi[2] = [(1+xi[1]*(2*xi[0]+xi[1]))/4, (1+xi[0]*(xi[0]+2*xi[1]))/4]
@@ -275,7 +292,7 @@ def shape_func_deriv(xi, nnodes_el, ndim):
     # ------------------------------
     # 3D elements
     elif ndim ==3:
-        if nnodes_el == 8:  # C3D8
+        if nelnodes == 8:  # C3D8
             dNdxi[0] = [-(1-xi[1])*(1-xi[2]), -(1-xi[0])*(1-xi[2]), -(1-xi[0])*(1-xi[1])]
             dNdxi[1] = [ (1-xi[1])*(1-xi[2]), -(1+xi[0])*(1-xi[2]), -(1+xi[0])*(1-xi[1])]
             dNdxi[2] = [ (1+xi[1])*(1-xi[2]),  (1+xi[0])*(1-xi[2]), -(1+xi[0])*(1+xi[1])]
@@ -287,12 +304,12 @@ def shape_func_deriv(xi, nnodes_el, ndim):
             dNdxi = 1/8*dNdxi
 
     else:
-        raise f'Model does not support ndim={ndim} and nnodes_el={nnodes_el}'
+        raise f'Model does not support ndim={ndim} and nelnodes={nelnodes}'
 
     return dNdxi
 
 
-def integration_points_weights(nnodes_el, ndim, reduced=False):
+def integration_points_weights(nelnodes, ndim, reduced=False):
 
     # Integration points sequence should be in accordance with the node sequence in element connectivity!
     if ndim == 1:  # 1D model
@@ -304,14 +321,14 @@ def integration_points_weights(nnodes_el, ndim, reduced=False):
             w  = np.array([1, 1])
 
     elif ndim == 2: # 2D model
-        if nnodes_el in [3, 6]:  # triangle element
+        if nelnodes in [3, 6]:  # triangle element
             if reduced:
                 xi = np.array([[1/3, 1/3]])
                 w = np.array([1/2])
             else:
                 xi = np.array([[0.6, 0.2], [0.2, 0.6], [0.2, 0.2]])
                 w  = np.array([1/6, 1/6, 1/6])
-        elif nnodes_el in [4, 8]:  # quadrilateral element
+        elif nelnodes in [4, 8]:  # quadrilateral element
             if reduced:
                 xi = np.array([[1/4, 1/4, 1/4]])
                 w = np.array([1/6])
@@ -340,35 +357,36 @@ def integration_points_weights(nnodes_el, ndim, reduced=False):
 
 def element_matrices(model):
 
-    nnodes_el, ndim = model.nnodes_el, model.ndim
-    xi_list, w = integration_points_weights(nnodes_el, ndim, reduced=False)
-    K_e = np.zeros((model.nel, nnodes_el*ndim, nnodes_el*ndim))
-    f_e = np.zeros((model.nel, nnodes_el*ndim))
+    nelnodes, ndim = model.nelnodes, model.ndim
+    xi_list, w = integration_points_weights(nelnodes, ndim, reduced=model.reduced_int)
+    K_e = np.zeros((model.nel, nelnodes*ndim, nelnodes*ndim))
+    f_e = np.zeros((model.nel, nelnodes*ndim))
 
     for iel, element in enumerate(model.elements):
         node_num = element
-        xs_node = model.nodes[node_num]                # (nnodes_el x ndim)
+        xs_node = model.nodes[node_num]                # (nelnodes x ndim)
         for ixi, xi in enumerate(xi_list):
-            # This part are performed at the integration point
-            # xs_int  = xs_node.T@shape_func(xi, nnodes_el, ndim)    # (ndim x 1) integration point coords
-            N = shape_func(xi, nnodes_el, ndim)            # (nnodes_el x ndim)
-            dNdxi = shape_func_deriv(xi, nnodes_el, ndim)            # (nnodes_el x ndim)
+            # This part is performed at the integration point
+            # xs_int = xs_node.T@shape_func(xi, nelnodes, ndim)    # (ndim x 1) integration point coords
+            N = shape_func(xi, nelnodes, ndim)            # (nelnodes)
+            dNdxi = shape_func_deriv(xi, nelnodes, ndim)            # (nelnodes x ndim)
             dxdxi = xs_node.T@dNdxi               # (ndim x ndim)
             # dxidx = np.linalg.inv(dxdxi)          # (ndim x ndim)
-            # dNdx  = dNdxi@dxidx                   # (nnodes_el x ndim)
+            # dNdx  = dNdxi@dxidx                   # (nelnodes x ndim)
             J = np.linalg.det(dxdxi)
             for inode, dNdxi_inode in enumerate(dNdxi):  # inode is the i-th node in the element
                 ind_i = inode*ndim
 
                 # Element force vector
-                bf = model.body_force[iel]  # (ndim x 1)
-                f_e[iel, ind_i:ind_i+ndim] += bf * w[ixi]*N[inode]*J  # (ndim x 1)
+                if model.body_force:
+                    bf = model.body_force[iel]  # (ndim x 1)
+                    f_e[iel, ind_i:ind_i+ndim] += bf * w[ixi]*N[inode]*J  # (ndim x 1)
 
                 for jnode, dNdxi_jnode in enumerate(dNdxi):
                     ind_j = jnode*ndim
 
                     # Element stiffness matrix
-                    K_e[iel, ind_i:ind_i+ndim, ind_j:ind_j+ndim] += w[ixi]/J*model.E*np.outer(dNdxi_inode, dNdxi_jnode)  # (ndim x ndim)
+                    K_e[iel, ind_i:ind_i+ndim, ind_j:ind_j+ndim] += w[ixi]/J*model.props['E']*np.outer(dNdxi_inode, dNdxi_jnode)  # (ndim x ndim)
 
     return K_e, f_e
 
@@ -381,7 +399,7 @@ def global_matrices(model, K_e, f_e):
 
     for iel, element in enumerate(model.elements):
         node_num = element
-        # xs_node = model.nodes[node_num]                # (nnodes_el x ndim)
+        # xs_node = model.nodes[node_num]                # (nelnodes x ndim)
         for inode, nodei in enumerate(node_num):  # nodei is the node number, inode is the i-th node in element definition
             ind_ii, ind_i = nodei*ndim, inode*ndim
             f_global[ind_ii:ind_ii+ndim] += f_e[iel, ind_i:ind_i+ndim]
@@ -393,16 +411,143 @@ def global_matrices(model, K_e, f_e):
     return K_global, f_global
 
 
+def nfacenodes(ndim, nelnodes):
+#====================== No. nodes on element faces ================
+#
+#    Copied from Bower's MatLab code
+#    This procedure returns the number of nodes on each element face
+#    for various element types.  This info is needed for computing
+#    the surface integrals associated with the element traction vector
+#
+    if ndim == 2:
+        if nelnodes == 3 or nelnodes == 4:
+            n = 2
+        elif (nelnodes == 6 or nelnodes == 8):
+            n = 3
+
+    elif (ndim == 3):
+        if (nelnodes == 4):
+            n = 3
+        elif (nelnodes == 10):
+            n = 6
+        elif (nelnodes == 8):
+            n = 4
+        elif (nelnodes == 20):
+            n = 8
+
+    return n
+
+def get_face_nodes(ndim,nelnodes,face):
+#======================= Lists of nodes on element faces =============
+#
+#    Copied from Bower's MatLab code
+#    This procedure returns the list of nodes on an element face
+#    The nodes are ordered so that the element face forms either
+#    a 1D line element or a 2D surface element for 2D or 3D problems
+#
+
+    i3 = [2,3,1]
+    i4 = [2,3,4,1]
+
+    face_nodes = np.zeros((nfacenodes(ndim,nelnodes)))
+
+    if (ndim == 2):
+        if (nelnodes == 3):
+            face_nodes[0] = face
+            face_nodes[1] = i3[face]
+        elif (nelnodes == 6):
+            face_nodes[0] = face
+            face_nodes[1] = i3[face]
+            face_nodes[2] = face+3
+        elif (nelnodes==4):
+            face_nodes[0] = face
+            face_nodes[1] = i4[face]
+        elif (nelnodes==8):
+            face_nodes[0] = face
+            face_nodes[1] = i4[face]
+            face_nodes[2] = face+4
+
+    elif (ndim == 3):
+        if (nelnodes==4):
+            if   (face == 1):
+                face_nodes = [1,2,3]
+            elif (face == 2):
+                face_nodes = [1,4,2]
+            elif (face == 3):
+                face_nodes = [2,4,3]
+            elif (face == 4):
+                face_nodes = [3,4,1]
+
+        elif (nelnodes == 10):
+            if   (face == 1):
+                face_nodes = [1,2,3,5,6,7]
+            elif (face == 2):
+                face_nodes = [1,4,2,8,9,5]
+            elif (face == 3):
+                face_nodes = [2,4,3,9,10,6]
+            elif (face == 4):
+                face_nodes = [3,4,1,10,8,7]
+
+        elif (nelnodes == 8):
+            if   (face == 1):
+                face_nodes = [1,2,3,4]
+            elif (face == 2):
+                face_nodes = [5,8,7,6]
+            elif (face == 3):
+                face_nodes = [1,5,6,2]
+            elif (face == 4):
+                face_nodes = [2,3,7,6]
+            elif (face == 5):
+                face_nodes = [3,7,8,4]
+            elif (face == 6):
+                face_nodes = [4,8,5,1]
+
+        elif (nelnodes == 20):
+            if   (face == 1):
+                face_nodes = [1,2,3,4,9,10,11,12]
+            elif (face == 2):
+                face_nodes = [5,8,7,6,16,15,14,13]
+            elif (face == 3):
+                face_nodes = [1,5,6,2,17,13,18,9]
+            elif (face == 4):
+                face_nodes = [2,6,7,3,18,14,19,10]
+            elif (face == 5):
+                face_nodes = [3,7,8,4,19,15,20,11]
+            elif (face == 6):
+                face_nodes = [4,8,5,1,20,16,17,12]
+
+    face_nodes = np.array(face_nodes) - 1  # Python is zero indexed.
+    return face_nodes.astype('int')
+
+
 def apply_boundary_conditions(model, K_global, f_global):
+
+    ndim, nelnodes = model.ndim, model.nelnodes
+    xi_list, w = integration_points_weights(nelnodes, ndim, reduced=model.reduced_int)
 
     # Update the global force vector with the traction term
     K_mod, f_mod = K_global, f_global
-    for traction in model.traction:
-        node = int(traction[0])
-        f_mod[node:node+model.ndim] += traction[1:]
+    for traction in model.tractions:  # [Element_#, Face_#, Traction_components]
+        face_element = int(traction[0])
+        element_nodes_global = model.elements[face_element]
+        face = int(traction[1])
+        face_nodes_local = get_face_nodes(ndim, nelnodes, face)
+        face_nodes_global = element_nodes_global[face_nodes_local]
+        xs_facenode = model.nodes[face_nodes_global]              # (nfacenodes x ndim)
+        for xi in xi_list:
+            N = shape_func(xi, nelnodes, ndim)            # (nelnodes)
+            dNdxi = shape_func_deriv(xi, nelnodes, ndim)  # (nelnodes x ndim)
+            N_face = N[face_nodes_local]                  # (nfacenodes)
+            dxdxi_face = xs_facenode.T@dNdxi              # (ndim x ndim)
+            # dxidx = np.linalg.inv(dxdxi)                # (ndim x ndim)
+            # dNdx  = dNdxi@dxidx                         # (nelnodes x ndim)
+            J_face = np.linalg.det(dxdxi_face)
+
+
+        f_mod[face_nodes_global*ndim+] += traction[1:]
 
     # Displacement boundary conditions
-    for BC in model.BC:
+    for BC in model.BCs:  # [Node_#, DOF#, Value]
         row = int(BC[0]*model.ndim + BC[1])
         K_mod[row,:] = 0
         K_mod[row,row] = 1
@@ -413,5 +558,5 @@ def apply_boundary_conditions(model, K_global, f_global):
 
 if __name__ == '__main__':
 
-    inp_fpath = './FEA sample code_Bower/Linear_elastic_quad4.txt'
+    inp_fpath = './MatLab sample code_Bower/Linear_elastic_quad4.txt'
     read_inp(inp_fpath, 'bower')

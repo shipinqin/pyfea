@@ -19,36 +19,36 @@ def readinput(inp_fpath):
     nnodes, ndim = nodes.shape
     if len(elements.shape) == 1:
         elements = np.array([elements])
-    nel, nnodes_el = elements.shape
+    nel, nelnodes = elements.shape
 
-    return nodes, elements, nnodes, ndim, nel, nnodes_el
+    return nodes, elements, nnodes, ndim, nel, nelnodes
 
 
-def shape_func(xi, nnodes_el, ndim):
+def shape_func(xi, nelnodes, ndim):
 
     # It seems, the sequence of shape function needs to be in accordance with the local coords system!
 
     # xi (1 x ndim) is the local coordinate
-    N = np.zeros(nnodes_el)
-    if ndim ==3 and nnodes_el == 8:
+    N = np.zeros(nelnodes)
+    if ndim ==3 and nelnodes == 8:
         for n_local in range(1,9):
             T1 = 1-xi[0] if n_local in [1, 4, 5, 8] else 1+xi[0]
             T2 = 1-xi[1] if n_local in [1, 2, 5, 6] else 1+xi[1]
             T3 = 1-xi[2] if n_local in [1, 2, 3, 4] else 1+xi[2]
             N[n_local-1] = 1/8*T1*T2*T3
-    elif ndim == 1 and nnodes_el == 2:
+    elif ndim == 1 and nelnodes == 2:
         N = np.array([(1-xi)/2, (1+xi)/2])
     else:
-        raise f'Model does not support ndim={ndim} and nnodes_el={nnodes_el}'
+        raise Exception(f'Model does not support ndim={ndim} and nelnodes={nelnodes}')
 
     return N
 
 
-def shape_func_deriv(xi, nnodes_el, ndim):
+def shape_func_deriv(xi, nelnodes, ndim):
 
     # x.T*shape_dev gives dx/dxi
-    dNdxi = np.zeros((nnodes_el, ndim))
-    if ndim ==3 and nnodes_el == 8:
+    dNdxi = np.zeros((nelnodes, ndim))
+    if ndim ==3 and nelnodes == 8:
         dNdxi[0] = [-(1-xi[1])*(1-xi[2]), -(1-xi[0])*(1-xi[2]), -(1-xi[0])*(1-xi[1])]
         dNdxi[1] = [ (1-xi[1])*(1-xi[2]), -(1+xi[0])*(1-xi[2]), -(1+xi[0])*(1-xi[1])]
         dNdxi[2] = [ (1+xi[1])*(1-xi[2]),  (1+xi[0])*(1-xi[2]), -(1+xi[0])*(1+xi[1])]
@@ -58,15 +58,15 @@ def shape_func_deriv(xi, nnodes_el, ndim):
         dNdxi[6] = [ (1+xi[1])*(1+xi[2]),  (1+xi[0])*(1+xi[2]),  (1+xi[0])*(1+xi[1])]
         dNdxi[7] = [-(1+xi[1])*(1+xi[2]),  (1-xi[0])*(1+xi[2]),  (1-xi[0])*(1+xi[1])]
         dNdxi = 1/8*dNdxi
-    elif ndim == 1 and nnodes_el == 2:
+    elif ndim == 1 and nelnodes == 2:
         dNdxi = np.array([[-1/2], [1/2]])
     else:
-        raise f'Model does not support ndim={ndim} and nnodes_el={nnodes_el}'
+        raise Exception(f'Model does not support ndim={ndim} and nelnodes={nelnodes}')
 
     return dNdxi
 
 
-def mat_stiffness(eps_, nnodes_el, ndim, E=201000, nu=0.3):
+def mat_stiffness(eps_, nelnodes, ndim, E=201000, nu=0.3):
 
     if ndim ==3:
         mu = E/2*(1+nu)  # shear modulus
@@ -88,14 +88,14 @@ def mat_stiffness(eps_, nnodes_el, ndim, E=201000, nu=0.3):
     return dsde
 
 
-def integration_points_weights(nnodes_el, ndim, reduced=False):
+def integration_points_weights(nelnodes, ndim, reduced=False):
 
-    if ndim ==3 and nnodes_el == 8:
+    if ndim ==3 and nelnodes == 8:
         if reduced:
             xi = np.array([0, 0, 0])
             w  = np.array([2])
         else:
-            xi = np.zeros((nnodes_el, ndim))
+            xi = np.zeros((nelnodes, ndim))
             sqrt3inv = 1/np.sqrt(3)
             x1D = [-sqrt3inv, sqrt3inv]
             for k in range(2):
@@ -111,30 +111,30 @@ def integration_points_weights(nnodes_el, ndim, reduced=False):
     return xi, w
 
 
-def element_stiffness(nodes, element, displacements, nnodes_el, ndim):
+def element_stiffness(nodes, element, displacements, nelnodes, ndim):
 
-    xi_list, w = integration_points_weights(nnodes_el, ndim, reduced=False)
-    K_e = np.zeros((ndim*nnodes_el, ndim*nnodes_el))
+    xi_list, w = integration_points_weights(nelnodes, ndim, reduced=False)
+    K_e = np.zeros((ndim*nelnodes, ndim*nelnodes))
 
     node_num = element
-    xs_node = nodes[node_num]                # (nnodes_el x ndim)
+    xs_node = nodes[node_num]                # (nelnodes x ndim)
     for ii, xi in enumerate(xi_list):
         # This part are performed at the integration point
-        # xs_int  = xs_node.T@shape_func(xi, nnodes_el, ndim)    # (ndim x 1) integration point coords
-        dNdxi = shape_func_deriv(xi, nnodes_el, ndim)            # (nnodes_el x ndim)
+        # xs_int  = xs_node.T@shape_func(xi, nelnodes, ndim)    # (ndim x 1) integration point coords
+        dNdxi = shape_func_deriv(xi, nelnodes, ndim)            # (nelnodes x ndim)
         dxdxi = xs_node.T@dNdxi               # (ndim x ndim)
         dxidx = np.linalg.inv(dxdxi)          # (ndim x ndim)
-        dNdx  = dNdxi@dxidx                   # (nnodes_el x ndim)
+        dNdx  = dNdxi@dxidx                   # (nelnodes x ndim)
         J = np.linalg.det(dxdxi)
 
         eps_ = 1/2*(displacements.T@dNdx + dNdx.T@displacements)  # This line projects displacement at the nodes to the strain at the integration point
-        dsde = mat_stiffness(eps_, nnodes_el, ndim)
+        dsde = mat_stiffness(eps_, nelnodes, ndim)
 
-        for A in range(nnodes_el):
+        for A in range(nelnodes):
             for i in range(ndim):
-                for B in range(nnodes_el):
+                for B in range(nelnodes):
                     for j in range(ndim):
-                        K_e[ndim*A+i, ndim*B+j] += w[ii] * J * dsde * (dNdx[A,i]*dNdx[B,j])  # (ndim*nnodes_el x ndim*nnodes_el)
+                        K_e[ndim*A+i, ndim*B+j] += w[ii] * J * dsde * (dNdx[A,i]*dNdx[B,j])  # (ndim*nelnodes x ndim*nelnodes)
 
     return K_e
 
@@ -143,7 +143,7 @@ def global_stiffness(nodes, elements, displacements, nnodes, ndim):
 
     K_global = np.zeros((ndim*nnodes, ndim*nnodes))
     for element in elements:
-        K_e = element_stiffness(nodes, element, displacements[element], nnodes_el, ndim)
+        K_e = element_stiffness(nodes, element, displacements[element], nelnodes, ndim)
         node_num = element
         for i, node1 in enumerate(node_num):
             for dim1 in range(ndim):
@@ -155,7 +155,7 @@ def global_stiffness(nodes, elements, displacements, nnodes, ndim):
 
 
 if __name__ == '__main__':
-    nodes, elements, nnodes, ndim, nel, nnodes_el = readinput('simple_tension_1D.inp')
+    nodes, elements, nnodes, ndim, nel, nelnodes = readinput('simple_tension_1D.inp')
     BCs = np.array([[0, 0, 0],
                     [4, 0, 0.1]])   # BC = [node number, dof, displacement]
 
