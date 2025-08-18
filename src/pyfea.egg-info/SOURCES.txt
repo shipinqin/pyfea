@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+src/pyfea/QFEM.py
+src/pyfea/utils.py
+src/pyfea.egg-info/PKG-INFO
+src/pyfea.egg-info/SOURCES.txt
+src/pyfea.egg-info/dependency_links.txt
+src/pyfea.egg-info/top_level.txt

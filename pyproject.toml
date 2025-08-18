@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyfea"
+version = "0.0.1"
+authors = [
+  { name="shipinqin", email="shipin.qin@hotmail.com" },
+]
+description = "A toy project for manual FEM implementation"
+requires-python = ">=3.12"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+
+[tool.setuptools.packages.find]
+where = ["src/pyfea"]
+include = ["*"]
+exclude = []

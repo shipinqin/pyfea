@@ -1,0 +1,8 @@
+README.md
+pyproject.toml
+src/pyfea/pyfea.egg-info/PKG-INFO
+src/pyfea/pyfea.egg-info/SOURCES.txt
+src/pyfea/pyfea.egg-info/dependency_links.txt
+src/pyfea/pyfea.egg-info/top_level.txt
+src/pyfea/elements/Elements.py
+src/pyfea/pyfea.egg-info/SOURCES.txt

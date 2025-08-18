@@ -1,4 +1,4 @@
-# QFEA
+# `pyfea`
 
 
 ## Files for Bower's sample code
