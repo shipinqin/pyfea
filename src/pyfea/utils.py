@@ -52,14 +52,22 @@ def read_inp(inp_fpath: os.PathLike, inp_format: str):
     elif inp_format == 'bower':
         nodes, elements, ndim, nnodes, nelnodes, nel, \
             props, nodal_disp, tractions, body_force = read_bower_inp(inp_fpath)
-        if len(props) == 3:
-            props = {'mu': props[0],
-                     'nu': props[1],
-                     'PSPE': props[2]}  # according to Bower, 0 means PS, 1 means PE
-            props.update({'E': 2*props['mu']*(1+props['nu'])})
+        key_map = {"Shear_modulus": "mu", "Poissons_ratio": "nu", "Plane_strain/stress": "PSPE"}
+        for key_old, key_new in key_map.items():
+            if key_old in props:
+                props[key_new] = props.pop(key_old)
+        # if len(props) == 3:
+        #     props = {'mu': props[0],
+        #              'nu': props[1],
+        #              'PSPE': props[2]}  # according to Bower, 0 means PS, 1 means PE
+        props.update({'E': 2*props['mu']*(1+props['nu'])})
 
     return nodes, elements, ndim, nnodes, nelnodes, nel, props, nodal_disp, tractions, body_force
 
+def get_name_and_value(line):
+    name = line.split(':')[0].strip()
+    value = float(line.split(':')[1].strip())
+    return name, value
 
 def get_value(line, type_):
 
@@ -150,11 +158,12 @@ def read_bower_inp(inp_fpath: os.PathLike):
 
         # Material properties
         nprops = get_value(lines[i], 'int')
-        props = np.zeros(nprops)
+        props = {}
         i += 1
 
         for j in range(nprops):
-            props[j] = get_value(lines[i+j], 'float')
+            name, value = get_name_and_value(lines[i+j])
+            props[name] = value
         i += nprops
 
         # Basic model info
@@ -330,7 +339,6 @@ def face_det(J_face: np.ndarray, ndim: int) -> float:
                       np.linalg.det(J_face[:,1:])**2+
                       np.linalg.det(J_face[:,0:3:2])**2)
     return det
-
 
 if __name__ == '__main__':
 

@@ -11,7 +11,8 @@ class Element:
 
         self.label = label
         self.nodes = nodes  # shape (nelnodes, )
-        self.nodes_x = self.nodes_x0 = nodes_x  # shape (nelnodes, ndim)
+        self.nodes_x0 = nodes_x  # shape (nelnodes, ndim)
+        self.nodes_x = nodes_x  # shape (nelnodes, ndim)
         self.nodes_u = np.zeros_like(nodes_x)  # Displacement at current step, shape (nelnodes, ndim)
         self.nodes_du = np.zeros_like(nodes_x)  # Displacement inc at current step, shape (nelnodes, ndim)
         self.nelnodes, self.ndim = nodes_x.shape
@@ -22,6 +23,7 @@ class Element:
         self.N = shape_func.get_shape_func(self.nelnodes, self.ndim)  # shape (nelnodes, )
         self.dNdxi = shape_func.get_shape_func_deriv(self.nelnodes, self.ndim) # shape (nelnodes, ndim)
         self.xi_int, self.w_int = shape_func.get_integration_points_weights(self.nelnodes, self.ndim, reduced_integration)
+        self.x_int = self.get_x_at_int()  # shape (nint, ndim)
 
         self._Jacobian = None  # This saves the Jacobian at integration points, in the same order as xi_int
         self._Jacobian_inv = None  # This saves the inverse of Jacobian at integration points, in the same order as xi_int
@@ -31,10 +33,22 @@ class Element:
         self.tractions = None
         self.body_force = 0.0
 
+        self.strain = np.zeros((len(self.xi_int), self.ndim, self.ndim))
+        self.stress = np.zeros((len(self.xi_int), self.ndim, self.ndim))
+        self.dstrain = np.zeros((len(self.xi_int), self.ndim, self.ndim))
+
     def set_solution(self, U):
-        self.nodes_du = U
-        self.nodes_u += U
-        self.nodes_x += U
+        self.nodes_du = U  # This is the displacement in the current inc
+
+    def post_process(self):
+        for ixi, xi in enumerate(self.xi_int):
+            self.dstrain[ixi] = self.get_dstrain(xi)
+            self.stress[ixi] = self.get_stress(xi)
+        self.strain += self.dstrain  # Total strain
+
+        # Update status
+        self.nodes_u += self.nodes_du  # Total displacement
+        self.nodes_x = self.nodes_x + self.nodes_du  # Current position
 
     def set_nodal_disp(self, nodal_disp: np.ndarray):
         self.nodal_disp = nodal_disp
@@ -83,6 +97,12 @@ class Element:
         dstrain = self.get_dstrain(xi)
         return self.material.get_stiffness(strain, dstrain)
 
+    def get_x_at_int(self) -> np.ndarray[np.ndarray[np.float64]]:
+        x_int = []
+        for xi in self.xi_int:
+            x_int.append(self.get_x(xi))
+        return np.array(x_int)  # shape (nint, ndim)
+
     def get_N_at_int(self) -> np.ndarray[np.ndarray[np.float64]]:
         N_int = []
         for xi in self.xi_int:
@@ -117,14 +137,14 @@ class Element:
 
         K_e = np.zeros((self.nelnodes*self.ndim, self.nelnodes*self.ndim))
 
-        dNdxi_at_int = self.get_dNdx_at_int()  # shape (nint, nelnodes, ndim)
+        dNdx_at_int = self.get_dNdx_at_int()  # shape (nint, nelnodes, ndim)
         C_at_int = self.get_consistent_stiffness_at_int()  # shape (nint, ndim, ndim, ndim, ndim)
         self.get_Jacobian_at_int()  # This will populate self._Jacobian, self._Jacobian_inv, self._Jacobian_det
 
         temp = np.zeros((self.nelnodes, self.ndim, self.ndim, self.nelnodes))  # shape (nelnodes, ndim, ndim, nelnodes)
         for ixi, xi in enumerate(self.xi_int):
             temp += self.w_int[ixi] * self._Jacobian_det[ixi] * \
-                     np.einsum("ij,jklm,mn->ikln", dNdxi_at_int[ixi, :, :], C_at_int[ixi], dNdxi_at_int[ixi, :, :].T)  # shape (nelnodes, ndim, ndim, nelnodes)
+                     np.einsum("ai,ijkl,lb->ajkb", dNdx_at_int[ixi, :, :], C_at_int[ixi], dNdx_at_int[ixi, :, :].T)  # shape (nelnodes, ndim, ndim, nelnodes)
         K_e = np.zeros((self.nelnodes*self.ndim, self.nelnodes*self.ndim))
         for inode in range(self.nelnodes):
             for jnode in range(self.nelnodes):

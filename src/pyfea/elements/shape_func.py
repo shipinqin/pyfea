@@ -9,8 +9,6 @@ def get_shape_func(nelnodes: int, ndim: int) -> Sequence[callable]:
     Returns a sequence of shape functions (nelnodes, ) that accepts local coordinates xi
     '''
 
-    N = np.zeros(nelnodes)
-
     # ------------------------------
     # 1D elements
     if ndim == 1:
@@ -51,13 +49,14 @@ def get_shape_func(nelnodes: int, ndim: int) -> Sequence[callable]:
     # ------------------------------
     # 3D elements
     elif ndim == 3:
+        N_temp = []
         if nelnodes == 8:  # C3D8
             for n_local in range(1,9):
                 T1 = lambda xi: 1-xi[0] if n_local in [1, 4, 5, 8] else 1+xi[0]
                 T2 = lambda xi: 1-xi[1] if n_local in [1, 2, 5, 6] else 1+xi[1]
                 T3 = lambda xi: 1-xi[2] if n_local in [1, 2, 3, 4] else 1+xi[2]
-                N[n_local-1] = lambda xi: 1/8*T1(xi)*T2(xi)*T3(xi)
-            N = lambda xi: np.array([Ni(xi) for Ni in N])
+                N_temp.append(lambda xi: 1/8*T1(xi)*T2(xi)*T3(xi))
+            N = lambda xi: np.array([Ni(xi) for Ni in N_temp])
         else:
             raise NotImplementedError(f"Model does not support {ndim=} and {nelnodes=}")
 
@@ -103,7 +102,7 @@ def get_shape_func_deriv(nelnodes: int, ndim: int) -> Sequence[callable]:
                                          [4*(xi2(xi)-xi[0]), -4*xi[0]]])
             # In Bower's code, dNdxi[4] and dNdxi[5] are wrong
         elif nelnodes == 4:  # 1st order quad
-            dNdxi = lambda xi: np.array([[-(1-xi[1])/4, -(1-xi[0])/4],
+            dNdxi = lambda xi: np.array([ [-(1-xi[1])/4, -(1-xi[0])/4],
                                           [(1-xi[1])/4, -(1+xi[0])/4],
                                           [(1+xi[1])/4, (1+xi[0])/4],
                                           [-(1+xi[1])/4, (1-xi[0])/4]])

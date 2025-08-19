@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pandas as pd
 from io import StringIO
 import matplotlib.pyplot as plt
 
@@ -10,7 +11,7 @@ from elements.Elements import Element
 OUT_PATH = "output"
 
 class FEModel():
-    def __init__(self, inp_fpath: os.PathLike, inp_format: str, el_type: str, job_name: str | None = None):
+    def __init__(self, inp_fpath: os.PathLike, inp_format: str, el_type: str | None = None, job_name: str | None = None):
 
         inp_format = inp_format.lower()
         assert inp_format in ['bower', 'abq']
@@ -23,8 +24,10 @@ class FEModel():
         # list of [Element_#, force vector] force vector
 
         self.reduced_integration = False
-        self.model_check(el_type)
         self.job_name = job_name or os.path.basename(inp_fpath).split('.')[0]
+
+        if el_type is not None:
+            self.model_check(el_type)
 
     def model_check(self, el_type):
 
@@ -46,7 +49,7 @@ class FEModel():
         return True
 
     def set_up_materials(self):
-        self.material = Material(E=self.props['E'], nu=self.props['nu'], ndim=self.ndim, pspe=self.props['PSPE'])
+        self.material = Material(self.props, ndim=self.ndim)
 
     def set_up_elements(self):
         self.Elements = {}
@@ -67,9 +70,10 @@ class FEModel():
         K = np.zeros((self.ndim*self.nnodes, self.ndim*self.nnodes))
         for iel, element in self.Elements.items():
             K_e = element.element_stiffness_matrix()
-            for inode, node in enumerate(element.nodes):
-                K[node*self.ndim:(node+1)*self.ndim, node*self.ndim:(node+1)*self.ndim] += \
-                    K_e[inode*self.ndim:(inode+1)*self.ndim, inode*self.ndim:(inode+1)*self.ndim]
+            for inode, nodei in enumerate(element.nodes):
+                for jnode, nodej in enumerate(element.nodes):
+                    K[nodei*self.ndim:(nodei+1)*self.ndim, nodej*self.ndim:(nodej+1)*self.ndim] += \
+                        K_e[inode*self.ndim:(inode+1)*self.ndim, jnode*self.ndim:(jnode+1)*self.ndim]
 
         self.K = K
         return K
@@ -107,6 +111,7 @@ class FEModel():
         U = np.linalg.solve(K, f)
         self.U = U.reshape((self.nnodes, self.ndim))
         self.set_solution()
+        self.post_process()
         return self.U
 
     def set_solution(self):
@@ -116,24 +121,52 @@ class FEModel():
     def reaction_forces(self):
         rf = []
         for node, dof, disp in self.nodal_disp:
-            row = node*self.ndim + dof
+            row = int(node*self.ndim + dof)
             rf.append(self.K[row, :] @ self.U.flatten() - self.f[row])
-        self.rf = np.array(rf)
+        rf = np.array(rf)
+        self.rf = pd.DataFrame(dict(
+            node = self.nodal_disp[:, 0],
+            dof = self.nodal_disp[:, 1],
+            disp = self.nodal_disp[:, 2],
+            reaction_force = rf
+        ))
         return self.rf
 
-    def post_analysis(self):
+    def post_process(self):
         RF = self.reaction_forces()
         for iel, element in self.Elements.items():
-            element.get_strain()
+            element.post_process()
+
+    def write_results(self, out_name: str | None = None):
+        out_name = out_name or f"{self.job_name}_results.csv"
+        df = pd.DataFrame(columns=["element", "integration_point", "x", "y", "e_11", "e_22", "e_12", "s_11", "s_22", "s_12"])
+        for iel, element in self.Elements.items():
+            for ixi, xi in enumerate(element.xi_int):
+                d = {
+                    "element": iel,
+                    "integration_point": ixi,
+                    "x": element.x_int[ixi][0],
+                    "y": element.x_int[ixi][1],
+                }
+                for i in range(self.ndim):
+                    for j in range(i, self.ndim):
+                        d[f"e_{i+1}{j+1}"] = element.strain[ixi][i, j]
+                        d[f"s_{i+1}{j+1}"] = element.stress[ixi][i, j]
+                df = pd.concat([df, pd.DataFrame(d, index=[0])], ignore_index=True)
+        df.to_csv(os.path.join(OUT_PATH, out_name), index=False, float_format='%.4f')
 
     def plot_domain(self, out_name: str | None = None):
         out_name = out_name or f"{self.job_name}_domain.png"
         fig, ax = plt.subplots()
         for iel, element in self.Elements.items():
-            nodes_x = element.nodes_x
             nodes_x0 = element.nodes_x0
-            ax.plot(nodes_x[:, 0], nodes_x[:, 1], 'go-', label=f'Element {iel}')
-            ax.plot(nodes_x0[:, 0], nodes_x0[:, 1], 'rx--', label=f'Element {iel} (Initial)')
+            nodes_x = element.nodes_x
+            nodes_x0 = np.append(nodes_x0, nodes_x0[np.newaxis, 0], axis=0)  # Close the loop
+            nodes_x = np.append(nodes_x, nodes_x[np.newaxis, 0], axis=0)  # Close the loop
+            # utils.plot_mesh_2D(ax, nodes_x0, color='green', marker='o', linestyle="-", label=f'Initial')
+            # utils.plot_mesh_2D(ax, nodes_x, color='red', marker='x', linestyle="--", label=f'Deformed')
+            ax.plot(nodes_x0[:, 0], nodes_x0[:, 1], 'go-', label=f'Element {iel} (Initial)')
+            ax.plot(nodes_x[:, 0], nodes_x[:, 1], 'rx-', label=f'Element {iel}')
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
         ax.set_title('Deformed and Initial Configuration')
@@ -144,10 +177,11 @@ class FEModel():
 if __name__ == '__main__':
 
     # inp_fpath = './MatLab sample code_Bower/Linear_elastic_quad4.txt'
-    inp_fpath = 'src/sample_code_matlab_Bower/Linear_elastic_quad4.txt'
-    model = FEModel(inp_fpath=inp_fpath, inp_format='bower', el_type='CPE4')  # inp_fpath, inp_format, el_type
+    inp_fpath = 'src/sample_code_matlab_Bower/linear_elastic_Brick8.txt'
+    model = FEModel(inp_fpath=inp_fpath, inp_format='bower')  # inp_fpath, inp_format, el_type
     model.set_up()
     model.solve()
+    model.write_results()
     model.plot_domain()
 
     # K_e, f_e = utils.element_matrices(model)

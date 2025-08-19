@@ -2,12 +2,13 @@ import numpy as np
 
 class Material:
 
-    def __init__(self, E: float, nu: float, ndim: int, pspe: int):
-        self.E = E  # Young's modulus
-        self.nu = nu  # Poisson's ratio
-        self.mu = self.E/2*(1+self.nu)  # shear modulus
+    def __init__(self, props: dict, ndim: int):
+
+        self.E = props.get('E', None)  # Young's modulus
+        self.nu = props.get('nu', None)  # Poisson's ratio
+        self.mu = props.get('mu', None) or self.E/(2*(1+self.nu))  # shear modulus
         self.ndim = ndim
-        self.pspe = pspe  # follow Bower convention, 0 means PS, 1 means PE
+        self.pspe = int(props.get('PSPE', 0))  # follow Bower convention, 0 means PS, 1 means PE
 
         self.C = self.stiffness()
 
@@ -51,4 +52,4 @@ class Material:
 
     def get_stress(self, strain: np.ndarray, dstrain: np.ndarray) -> np.ndarray:
         dsde = self.get_stiffness(strain, dstrain)
-        return dsde @ (strain + dstrain)
+        return np.einsum('ijkl,kl->ij', dsde, (strain + dstrain))
