@@ -1,8 +1,13 @@
 README.md
 pyproject.toml
-src/pyfea/QFEM.py
+src/pyfea/__init__.py
+src/pyfea/femodel.py
+src/pyfea/material.py
+src/pyfea/test.py
 src/pyfea/utils.py
 src/pyfea.egg-info/PKG-INFO
 src/pyfea.egg-info/SOURCES.txt
 src/pyfea.egg-info/dependency_links.txt
 src/pyfea.egg-info/top_level.txt
+src/pyfea/elements/Elements.py
+src/pyfea/elements/shape_func.py

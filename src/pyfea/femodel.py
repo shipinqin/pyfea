@@ -4,9 +4,9 @@ import pandas as pd
 from io import StringIO
 import matplotlib.pyplot as plt
 
-import utils
-from material import Material
-from elements.Elements import Element
+from pyfea import utils
+from pyfea.material import Material
+from pyfea.elements.Elements import Element
 
 OUT_PATH = "output"
 
@@ -112,7 +112,6 @@ class FEModel():
         self.U = U.reshape((self.nnodes, self.ndim))
         self.set_solution()
         self.post_process()
-        return self.U
 
     def set_solution(self):
         for element in self.Elements.values():
@@ -155,62 +154,34 @@ class FEModel():
                 df = pd.concat([df, pd.DataFrame(d, index=[0])], ignore_index=True)
         df.to_csv(os.path.join(OUT_PATH, out_name), index=False, float_format='%.4f')
 
-    def plot_domain(self, out_name: str | None = None):
+    def plot_domain(self, out_name: str | None = None, out_path: os.PathLike | None = None):
         out_name = out_name or f"{self.job_name}_domain.png"
+        out_path = out_path or OUT_PATH
+
         fig, ax = plt.subplots()
-        for iel, element in self.Elements.items():
-            nodes_x0 = element.nodes_x0
-            nodes_x = element.nodes_x
-            nodes_x0 = np.append(nodes_x0, nodes_x0[np.newaxis, 0], axis=0)  # Close the loop
-            nodes_x = np.append(nodes_x, nodes_x[np.newaxis, 0], axis=0)  # Close the loop
-            # utils.plot_mesh_2D(ax, nodes_x0, color='green', marker='o', linestyle="-", label=f'Initial')
-            # utils.plot_mesh_2D(ax, nodes_x, color='red', marker='x', linestyle="--", label=f'Deformed')
-            ax.plot(nodes_x0[:, 0], nodes_x0[:, 1], 'go-', label=f'Element {iel} (Initial)')
-            ax.plot(nodes_x[:, 0], nodes_x[:, 1], 'rx-', label=f'Element {iel}')
+
+        utils.plot_mesh(self.Elements, ax=ax, config="Initial", color='green', marker='o', linestyle="-")
+        utils.plot_mesh(self.Elements, ax=ax, config="Deformed", color='red', marker='x', linestyle="-")
+
         ax.set_xlabel('X')
         ax.set_ylabel('Y')
-        ax.set_title('Deformed and Initial Configuration')
-        # ax.legend()
-        plt.savefig(os.path.join(OUT_PATH, out_name))
-        plt.close()
+        ax.set_title(self.job_name)
+
+        h, l = ax.get_legend_handles_labels()
+        h = [h[0], h[len(self.Elements)]]  # Keep only one legend for each configuration
+        l = [l[0], l[len(self.Elements)]]  # Keep only one legend for each configuration
+        ax.legend(h[:2], l[:2], frameon=False)
+        plt.savefig(os.path.join(out_path, out_name))
+        # plt.close()
+        return fig, ax
 
 if __name__ == '__main__':
 
     # inp_fpath = './MatLab sample code_Bower/Linear_elastic_quad4.txt'
     inp_fpath = 'src/sample_code_matlab_Bower/linear_elastic_Brick8.txt'
+    inp_fpath = 'src/sample_code_matlab_Bower/shear_locking_demo.txt'
     model = FEModel(inp_fpath=inp_fpath, inp_format='bower')  # inp_fpath, inp_format, el_type
     model.set_up()
     model.solve()
     model.write_results()
     model.plot_domain()
-
-    # K_e, f_e = utils.element_matrices(model)
-    # K_global, f_global = utils.global_matrices(model, K_e, f_e)
-    # K_mod, f_mod = utils.apply_boundary_conditions(model, K_global, f_global)
-
-    # displacement = np.zeros(ndim*nnodes)
-    # K = global_stiffness(nodes, elements, displacement, nnodes, ndim)
-    # F = np.zeros((ndim*nnodes))
-    # ind = []
-    # for BC in BCs:
-    #     ind.append(int(ndim*BC[0]+BC[1]))
-    # for i, val in enumerate(ind):
-    #     F -= K[val] * BCs[i,2]
-    #     F[val] = BCs[i,2]
-    #     K[:,val], K[val,:] = 0, 0
-    #     K[val,val] = 1
-    # K = np.delete(K, ind, axis=0)
-    # K = np.delete(K, ind, axis=1)
-
-    # U = np.linalg.inv(K_mod)@f_mod
-    # print(U)
-    # np.savetxt("K_mod.csv", K_mod, delimiter=",")
-    # np.savetxt("f_mod.csv", f_mod, delimiter=",")
-
-    # fig, ax = plt.subplots()
-    # ax.plot(model.nodes, U, marker='o')
-    # ax.set_xlabel('x')
-    # ax.set_ylabel('Displacement')
-
-    # fig.show()
-

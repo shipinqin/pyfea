@@ -1,9 +1,9 @@
 import numpy as np
 from typing import Sequence
 
-from elements import shape_func
-from material import Material
-import utils
+from pyfea.elements import shape_func
+from pyfea.material import Material
+from pyfea import utils
 
 class Element:
 
@@ -65,6 +65,10 @@ class Element:
         self.nodes_x += self.nodes_du
         self.nodes_u += self.nodes_du
 
+    def get_x0(self, xi: np.ndarray) -> np.ndarray[np.float64]:
+        assert len(xi) == self.ndim
+        return self.N(xi)@self.nodes_x0  # shape (ndim, )
+
     def get_x(self, xi: np.ndarray) -> np.ndarray[np.float64]:
         assert len(xi) == self.ndim
         return self.N(xi)@self.nodes_x  # shape (ndim, )
@@ -79,11 +83,13 @@ class Element:
 
     def get_strain(self, xi: np.ndarray) -> np.ndarray[np.float64]:
         assert len(xi) == self.ndim
-        return self.get_dNdx(xi).T @ self.nodes_u  # shape (ndim, ndim)
+        strain = self.get_dNdx(xi).T @ self.nodes_u  # shape (ndim, ndim)
+        return 1/2*(strain + strain.T)  # shape (ndim, ndim), small strain tensor
 
     def get_dstrain(self, xi: np.ndarray) -> np.ndarray[np.float64]:
         assert len(xi) == self.ndim
-        return self.get_dNdx(xi).T @ self.nodes_du  # shape (ndim, ndim)
+        dstrain = self.get_dNdx(xi).T @ self.nodes_du  # shape (ndim, ndim)
+        return 1/2*(dstrain + dstrain.T)  # shape (ndim, ndim), small strain tensor
 
     def get_stress(self, xi: np.ndarray) -> np.ndarray[np.float64]:
         assert len(xi) == self.ndim

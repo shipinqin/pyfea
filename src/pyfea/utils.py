@@ -1,8 +1,41 @@
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 
-from femodel import FEModel
+from typing import Literal
 
+from pyfea.elements.Elements import Element
+
+
+def plot_mesh(Elements: dict[int, Element],
+              config: Literal["Initial", "Deformed"] = "Initial",
+              out_fpath: os.PathLike | None = None,
+              ax: plt.Axes | None = None,
+              label: str | None = None,
+              **plt_kwargs
+              ):
+
+    new_plot = False
+    if ax is None:
+        fig, ax = plt.subplots()
+        new_plot = True
+    label = label or config
+    for iel, element in Elements.items():
+        nodes_x = element.nodes_x if config == "Deformed" else element.nodes_x0
+        nodes_x = np.append(nodes_x, nodes_x[np.newaxis, 0], axis=0)  # Close the loop
+        # utils.plot_mesh_2D(ax, nodes_x0, color='green', marker='o', linestyle="-", label=f'Initial')
+        # utils.plot_mesh_2D(ax, nodes_x, color='red', marker='x', linestyle="--", label=f'Deformed')
+        ax.plot(nodes_x[:, 0], nodes_x[:, 1], label=label, **plt_kwargs)
+
+    if new_plot:
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_title('Deformed and Initial Configuration')
+        h, l = ax.get_legend_handles_labels()
+        ax.legend(h[:1], l[:1], frameon=False)
+        if out_fpath:
+            plt.savefig(out_fpath)
+            plt.close()
 
 def read_inp(inp_fpath: os.PathLike, inp_format: str):
 

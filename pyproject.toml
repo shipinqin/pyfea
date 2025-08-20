@@ -16,6 +16,6 @@ classifiers = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["src/pyfea"]
+where = ["src"]
 include = ["*"]
 exclude = []
