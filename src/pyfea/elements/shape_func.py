@@ -21,7 +21,7 @@ def get_shape_func(nelnodes: int, ndim: int) -> Sequence[callable]:
     # 2D elements
     elif ndim == 2:
         if nelnodes == 3:  # 1st order triangle
-            N = lambda xi:np.array([xi[0], xi[1], 1-xi[0]-xi[1]])
+            N = lambda xi:np.array([xi[0], xi[1], 1.-xi[0]-xi[1]])
         elif nelnodes == 6:  # 2nd order triangle
             xi2 = lambda xi: 1-xi[0]-xi[1]
             N = lambda xi: np.array([(2*xi[0]-1)*xi[0],
@@ -88,9 +88,9 @@ def get_shape_func_deriv(nelnodes: int, ndim: int) -> Sequence[callable]:
     # 2D elements
     elif ndim == 2:
         if nelnodes == 3:  # 1st order triangle
-            dNdxi[0] = lambda xi: np.array([[1, 0],
-                                            [0, 1],
-                                            [-1, -1]])
+            dNdxi = lambda xi: np.array([[1, 0],
+                                         [0, 1],
+                                         [-1, -1]])
 
         elif nelnodes == 6:  # 2nd order triangle
             xi2 = lambda xi: 1-xi[0]-xi[1]

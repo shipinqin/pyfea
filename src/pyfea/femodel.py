@@ -180,6 +180,7 @@ if __name__ == '__main__':
     # inp_fpath = './MatLab sample code_Bower/Linear_elastic_quad4.txt'
     inp_fpath = 'src/sample_code_matlab_Bower/linear_elastic_Brick8.txt'
     inp_fpath = 'src/sample_code_matlab_Bower/shear_locking_demo.txt'
+    inp_fpath = 'src/sample_code_matlab_Bower/linear_elastic_triangles.txt'
     model = FEModel(inp_fpath=inp_fpath, inp_format='bower')  # inp_fpath, inp_format, el_type
     model.set_up()
     model.solve()
