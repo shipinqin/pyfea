@@ -1,5 +1,8 @@
 # `pyfea`
 
+- Manual FEA implementation with python.
+- A toy code for fun.
+- Lots of reference from AF Bower, Applied Mechanics of Solids.
 
 ## Files for Bower's sample code
 
